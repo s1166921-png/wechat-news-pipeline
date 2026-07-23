@@ -15,6 +15,8 @@ from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dotenv import load_dotenv
+from pipeline_core import importing as _core_importing
+from pipeline_core import quality as _core_quality
 
 # ── 路径常量 ──────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
@@ -84,83 +86,26 @@ CST = timezone(timedelta(hours=8))
 
 def _today_cst_label(now=None):
     """Return today's date in Chinese format for prompts."""
-    current = now or datetime.now(CST)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=CST)
-    else:
-        current = current.astimezone(CST)
-    return f"{current.year}年{current.month}月{current.day}日"
+    return _core_importing.today_cst_label(now=now)
 
 
 def _urlopen_final_url(url, timeout=10, headers=None):
     """Open a URL and return the final URL after redirects."""
-    req = urllib.request.Request(url, headers=headers or {})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.geturl()
+    return _core_importing.urlopen_final_url(url, timeout=timeout, headers=headers)
 
 
 def _resolve_wechat_url(url, timeout=10):
     """Normalize WeChat article URLs, including Sogou WeChat redirect links."""
-    if not url:
-        return url
-    clean_url = url.strip()
-    if "mp.weixin.qq.com/" in clean_url:
-        return clean_url
-    if "weixin.sogou.com/link" not in clean_url:
-        return clean_url
-
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    }
-    try:
-        final_url = _urlopen_final_url(clean_url, timeout=timeout, headers=headers)
-        if final_url and "mp.weixin.qq.com/" in final_url:
-            return final_url
-    except Exception as e:
-        print(f"  [WeChatURL] resolve failed: {e}")
-    return clean_url
+    return _core_importing.resolve_wechat_url(
+        url,
+        timeout=timeout,
+        urlopen_func=_urlopen_final_url,
+    )
 
 
 def _classify_article_import(url="", raw_content=""):
     """Describe how an article should enter the rewrite pipeline."""
-    clean_url = (url or "").strip()
-    clean_content = (raw_content or "").strip()
-
-    if clean_content:
-        return {
-            "mode": "raw_content",
-            "recommendation": "rewrite_directly",
-            "message": "已使用粘贴全文作为原文素材",
-        }
-    if "weixin.sogou.com/link" in clean_url:
-        return {
-            "mode": "wechat_sogou_redirect",
-            "recommendation": "resolve_then_fetch",
-            "message": "搜狗微信跳转链接会先解析为公众号原文链接",
-        }
-    if "mp.weixin.qq.com/" in clean_url:
-        return {
-            "mode": "wechat_direct",
-            "recommendation": "fetch_or_paste",
-            "message": "公众号原文链接可尝试抓取；失败时建议粘贴全文",
-        }
-    if clean_url:
-        return {
-            "mode": "url",
-            "recommendation": "fetch_directly",
-            "message": "普通网页链接会尝试自动提取正文",
-        }
-    return {
-        "mode": "empty",
-        "recommendation": "provide_input",
-        "message": "请提供文章链接或粘贴全文",
-    }
+    return _core_importing.classify_article_import(url=url, raw_content=raw_content)
 
 # ╔══════════════════════════════════════════════════════╗
 # ║  LLM Client (DeepSeek)                              ║
@@ -1702,132 +1647,22 @@ _INDUSTRY_SOURCES = [
 
 def _keyword_relevance_terms(keyword):
     """Build compact relevance terms from a mixed Chinese/English keyword."""
-    terms = []
-    kw = (keyword or "").lower().strip()
-    if not kw:
-        return terms
-
-    for term in re.split(r"[\s,，;；|/]+", kw):
-        term = term.strip()
-        if len(term) >= 2 and term not in terms:
-            terms.append(term)
-
-    cjk_runs = re.findall(r"[一-鿿]{2,}", kw)
-    for run in cjk_runs:
-        if len(run) <= 4 and run not in terms:
-            terms.append(run)
-        for i in range(len(run) - 1):
-            bg = run[i:i + 2]
-            if bg not in terms:
-                terms.append(bg)
-
-    return terms
+    return _core_quality.keyword_relevance_terms(keyword)
 
 
 def _has_keyword_relevance(item, keyword):
     """Return True when an item matches at least one meaningful keyword signal."""
-    terms = _keyword_relevance_terms(keyword)
-    if not terms:
-        return True
-
-    generic_terms = {
-        "最新", "新闻", "动态", "趋势", "分析", "报告", "案例", "指南", "深度",
-        "重磅", "政策", "变化", "增长", "运营", "市场", "行业", "发展", "未来",
-        "中国", "企业", "公司", "平台",
-    }
-
-    text = " ".join([
-        item.get("title", ""),
-        item.get("snippet", ""),
-        item.get("source", ""),
-    ]).lower()
-    compact_text = re.sub(r"\s+", "", text)
-
-    strong_hits = 0
-    specific_hits = 0
-    has_specific_terms = any(t not in generic_terms for t in terms)
-    for term in terms:
-        compact_term = re.sub(r"\s+", "", term.lower())
-        if not compact_term:
-            continue
-        if compact_term in compact_text:
-            strong_hits += 1
-            if compact_term not in generic_terms:
-                specific_hits += 1
-
-    if has_specific_terms:
-        return specific_hits >= 1
-    return strong_hits >= 1
+    return _core_quality.has_keyword_relevance(item, keyword)
 
 
 def _filter_quality_results(results, keyword="", profile_context=None):
     """Filter out low-quality results: baike/zhidao/wiki/pure-definition pages, broken links."""
-    scored = []
-    for r in results:
-        url = r.get("url", "")
-        title = r.get("title", "")
-
-        # ── URL 校验 ──
-        if not url or len(url) < 15:
-            continue
-        # 过滤明显死链
-        if any(x in url for x in ("javascript:", "void(0)", "mailto:", "tel:")):
-            continue
-        # URL 过长（>500 字符）通常是跟踪链接或已失效
-        if len(url) > 500:
-            continue
-
-        # ── 标题质量 ──
-        if len(title) < 10:  # 至少 10 个字
-            continue
-        if len(title) > 200:  # 太长通常是 SEO 标题堆砌
-            continue
-        # 纯符号/数字标题
-        meaningful = sum(1 for c in title if c.isalpha() or ('一' <= c <= '鿿'))
-        if meaningful < 5:
-            continue
-
-        # Skip non-Chinese/non-English junk (e.g., Thai, Arabic)
-        cjk_chars = sum(1 for c in title if '一' <= c <= '鿿' or '぀' <= c <= 'ヿ')
-        ascii_chars = sum(1 for c in title if c.isascii() and c.isalpha())
-        total_alnum = sum(1 for c in title if c.isalnum() or c.isspace())
-        if total_alnum > 0:
-            recognizable = (cjk_chars + ascii_chars) / total_alnum
-            if recognizable < 0.5:
-                continue
-
-        # Skip known low-quality domains
-        if any(d in url for d in _LOW_QUALITY_DOMAINS):
-            continue
-
-        # Skip pure definition/FAQ/dictionary pages
-        title_bad = [
-            "是什么意思", "有什么区别", "意思和区别",
-            "百度百科", "维基百科", "百度知道",
-            "词的区别", "区别解释",
-            "境外、国外、海外", "海外境外国外",
-            "中国领事服务网", "海外_百度百科",
-            "汉语词典", "新华字典", "的拼音", "的部首",
-            "组词_", "怎么读_",
-            # 低质量 SEO 页面
-            "网址导航", "友情链接", "广告合作",
-        ]
-        if any(s in title for s in title_bad):
-            continue
-
-        if keyword and not _has_keyword_relevance(r, keyword):
-            continue
-
-        # Score: industry source gets a boost
-        source_score = 0
-        for d in _INDUSTRY_SOURCES:
-            if d in url:
-                source_score = 1
-                break
-        scored.append((source_score, r))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [r for _, r in scored]
+    return _core_quality.filter_quality_results(
+        results,
+        keyword=keyword,
+        low_quality_domains=_LOW_QUALITY_DOMAINS,
+        industry_sources=_INDUSTRY_SOURCES,
+    )
 
 
 def _fetch_news_rotating(limit=20):
