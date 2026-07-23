@@ -1192,9 +1192,9 @@
         var d = await r.json();
         if (d.error) {
           rewriteStatus.className = "rewrite-status error";
-          rewriteStatus.textContent = "❌ " + d.error;
+          rewriteStatus.textContent = d.error_hint || d.hint || d.error;
           // If URL fetch failed, auto-expand paste area and prompt
-          if (!rawContent && (d.error.includes("无法提取") || d.error.includes("反爬"))) {
+          if (!rawContent && (d.manual_import_recommended || d.error.includes("无法提取") || d.error.includes("反爬"))) {
             var pasteArea = $("#rewrite-paste-area");
             if (pasteArea && pasteArea.style.display === "none") {
               pasteArea.style.display = "flex";
@@ -1206,7 +1206,7 @@
               rawTextarea.placeholder = "请在这里粘贴文章全文（在浏览器中打开文章 → 全选复制 → 粘贴到这里）";
               rawTextarea.focus();
             }
-            rewriteStatus.innerHTML = "服务器无法直接访问该文章。请在上方粘贴全文后再次点击「改写文章」。";
+            rewriteStatus.innerHTML = (d.error_hint || d.hint || "服务器无法直接访问该文章。") + "<br>请在上方粘贴全文后再次点击「改写文章」。";
           }
           return;
         }

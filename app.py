@@ -15,6 +15,7 @@ from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dotenv import load_dotenv
+from pipeline_core import extractors as _core_extractors
 from pipeline_core import importing as _core_importing
 from pipeline_core import quality as _core_quality
 
@@ -3903,12 +3904,22 @@ def api_fetch_article():
 
     article = _fetch_article_content(url)
     if not article:
+        failure = _core_extractors.article_failure(
+            url,
+            status="extract_failed",
+            error_hint="服务器端提取失败（可能被反爬拦截），建议在浏览器中打开文章后复制全文导入",
+        )
         return jsonify({
             "error": "无法提取文章内容，请检查链接是否正确，或尝试直接粘贴文章全文",
-            "hint": "服务器端提取失败（可能被反爬拦截），建议在浏览器中打开文章 → 复制全文 → 使用 'raw_content' 模式"
+            "hint": failure["error_hint"],
+            "status": failure["status"],
+            "error_hint": failure["error_hint"],
+            "manual_import_recommended": failure["manual_import_recommended"],
+            "source_url": failure["source_url"],
+            "extraction_method": failure["extraction_method"],
         }), 422
 
-    return jsonify(article)
+    return jsonify(_core_extractors.normalize_article_result(article, fallback_url=url))
 
 
 @app.route("/api/rewrite", methods=["POST"])
@@ -3951,11 +3962,25 @@ def api_rewrite_article():
     elif url:
         article = _fetch_article_content(url)
         if not article:
+            failure = _core_extractors.article_failure(
+                url,
+                status="extract_failed",
+                error_hint="无法提取文章内容，请在浏览器中打开文章后复制全文导入",
+            )
             return jsonify({
                 "error": "无法提取文章内容，请检查链接或改用 raw_content 模式",
-                "hint": "在浏览器中打开文章 → 复制全文 → 使用 raw_content 参数提交"
+                "hint": failure["error_hint"],
+                "status": failure["status"],
+                "error_hint": failure["error_hint"],
+                "manual_import_recommended": failure["manual_import_recommended"],
+                "source_url": failure["source_url"],
+                "extraction_method": failure["extraction_method"],
+                "import_mode": import_info["mode"],
+                "import_recommendation": import_info["recommendation"],
+                "import_message": import_info["message"],
             }), 422
 
+        article = _core_extractors.normalize_article_result(article, fallback_url=url)
         original_title = article["title"]
         original_author = article.get("author", "")
         source_content = article["content"]

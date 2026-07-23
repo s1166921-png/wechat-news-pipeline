@@ -131,5 +131,21 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertEqual(data["source_url"], "https://mp.weixin.qq.com/s/final")
 
 
+class FetchArticleEndpointTests(unittest.TestCase):
+    def test_fetch_article_wechat_failure_returns_structured_manual_import_hint(self):
+        client = app.app.test_client()
+
+        with patch("app._fetch_article_content", return_value=None):
+            response = client.post("/api/fetch-article", json={
+                "url": "https://mp.weixin.qq.com/s/blocked",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(data["status"], "extract_failed")
+        self.assertTrue(data["manual_import_recommended"])
+        self.assertIn("error_hint", data)
+
+
 if __name__ == "__main__":
     unittest.main()
