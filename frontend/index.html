@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,"><!-- 阻止浏览器请求 /favicon.ico -->
+<title>美鸥热点通 — 内容创作工坊</title>
+<link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <span class="logo-icon">🔥</span>
+      <div>
+        <h1 class="app-title">美鸥热点通</h1>
+        <p class="app-subtitle">美鸥资讯的内容创作工坊 — 从热点到文章，一步到位</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="health-dot" class="health-dot" title="服务器状态">⚪</span>
+      <span id="health-text" class="health-text">检测中...</span>
+    </div>
+  </header>
+
+  <!-- Step Indicator -->
+  <nav class="step-nav">
+    <div class="step active" data-step="1">
+      <div class="step-circle">1</div>
+      <div class="step-label">
+        <span class="step-title">发现热点</span>
+        <span class="step-desc">搜索最新行业资讯</span>
+      </div>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step" data-step="2">
+      <div class="step-circle">2</div>
+      <div class="step-label">
+        <span class="step-title">生成文章</span>
+        <span class="step-desc">AI 撰写 GEO 优化内容</span>
+      </div>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step" data-step="3">
+      <div class="step-circle">3</div>
+      <div class="step-label">
+        <span class="step-title">配图导出</span>
+        <span class="step-desc">AI 生成配图 + 导出</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- === 快捷改写：导入文章直接改写 === -->
+  <section id="rewrite-bar" class="rewrite-bar">
+    <div class="rewrite-bar-header">
+      <span class="rewrite-bar-icon">✍</span>
+      <span class="rewrite-bar-title">文章改写</span>
+      <span class="rewrite-bar-hint">公众号建议直接粘贴全文；普通新闻链接可尝试自动提取</span>
+      <button id="btn-toggle-rewrite" class="btn-toggle-rewrite" title="展开/收起">▼</button>
+    </div>
+    <div class="rewrite-bar-body" id="rewrite-bar-body">
+      <div class="rewrite-paste-area" id="rewrite-paste-area">
+        <textarea id="rewrite-raw-content" class="rewrite-raw-textarea"
+                  rows="5" placeholder="粘贴微信公众号文章全文。&#10;&#10;推荐流程：在微信中打开文章 → 全选复制 → 粘贴到这里 → 选择风格 → 改写文章"></textarea>
+        <input type="text" id="rewrite-raw-title" class="rewrite-url-input"
+               placeholder="文章标题（可选）" style="margin-top:6px">
+      </div>
+      <div class="rewrite-input-row">
+        <input type="text" id="rewrite-url" class="rewrite-url-input"
+               placeholder="或粘贴文章链接：https://mp.weixin.qq.com/s/...">
+        <div class="rewrite-style-selector">
+          <button class="rewrite-style-btn active" data-rewrite-style="b2p">政策解读</button>
+          <button class="rewrite-style-btn" data-rewrite-style="b2b">B2B 专业</button>
+          <button class="rewrite-style-btn" data-rewrite-style="b2c">B2C 亲测</button>
+        </div>
+        <button id="btn-rewrite" class="btn btn-primary">改写文章</button>
+        <button id="btn-show-paste" class="btn btn-outline btn-sm" title="显示或隐藏全文粘贴区">收起全文</button>
+      </div>
+      <div id="rewrite-status" class="rewrite-status"></div>
+    </div>
+  </section>
+
+  <!-- === STEP 1: 发现热点 === -->
+  <section id="step1-panel" class="step-panel active">
+    <div class="search-area">
+      <div class="search-box">
+        <input type="text" id="search-input" class="search-input"
+               placeholder="输入关键词，发现最新跨境热点…" value="海外仓 趋势">
+        <div class="search-actions">
+          <button id="btn-search" class="btn btn-primary">🔍 搜索</button>
+          <button id="btn-refresh-topics" class="btn btn-outline">🔄 刷新热点</button>
+        </div>
+      </div>
+      <div class="engine-selector" id="engine-selector">
+        <span class="engine-label">搜索范围：</span>
+        <label class="engine-chip" data-engine="360search"><input type="checkbox" checked> 360 新闻</label>
+        <label class="engine-chip" data-engine="sogou_news"><input type="checkbox" checked> 搜狗新闻</label>
+
+        <label class="engine-chip ebrun" data-engine="ebrun"><input type="checkbox" checked> 亿邦动力</label>
+        <label class="engine-chip kr36" data-engine="36kr"><input type="checkbox" checked> 36氪</label>
+        <label class="engine-chip" data-engine="bing"><input type="checkbox"> Bing</label>
+        <label class="engine-chip" data-engine="google_news"><input type="checkbox"> Google News</label>
+      </div>
+      <div class="hot-tags" id="hot-tags">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <div class="content-split">
+      <!-- News list -->
+      <div class="news-list-panel">
+        <div class="panel-header">
+          <h3 id="news-count">📰 热点资讯 <span class="badge" id="news-badge">0</span></h3>
+          <span class="text-muted" id="search-info"></span>
+        </div>
+        <div id="news-list" class="news-list">
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <p>输入关键词搜索或点击「刷新热点」获取最新跨境资讯</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected news detail -->
+      <div class="news-detail-panel" id="news-detail-panel">
+        <div class="empty-state">
+          <div class="empty-icon">👆</div>
+          <p>点击左侧新闻查看 AI 选题建议</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-actions">
+      <button id="btn-to-step2" class="btn btn-primary btn-lg" disabled>
+        下一步：生成文章 →
+      </button>
+    </div>
+  </section>
+
+  <!-- === STEP 2: 生成文章 === -->
+  <section id="step2-panel" class="step-panel">
+    <div class="content-split">
+      <!-- Settings panel -->
+      <div class="settings-panel">
+        <div class="panel-header">
+          <h3>⚙️ 文章设置</h3>
+        </div>
+        <div class="settings-body">
+          <div class="form-group">
+            <label>📌 选题</label>
+            <div id="selected-topic-display" class="topic-display">
+              <em class="text-muted">未选择选题</em>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>🎨 写作风格</label>
+            <div class="style-toggle">
+              <button class="style-btn" data-style="b2p">
+                <span class="style-icon">📰</span>
+                <span class="style-name">政策解读</span>
+                <span class="style-hint">PART结构 · 行业深度分析</span>
+              </button>
+              <button class="style-btn active" data-style="b2b">
+                <span class="style-icon">🏢</span>
+                <span class="style-name">B2B 专业</span>
+                <span class="style-hint">首席架构师 · 对比表格</span>
+              </button>
+              <button class="style-btn" data-style="b2c">
+                <span class="style-icon">👤</span>
+                <span class="style-name">B2C 亲测</span>
+                <span class="style-hint">真实用户 · 口语化</span>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>💡 自定义角度 <span class="text-muted">(可选)</span></label>
+            <textarea id="custom-angle" class="input-textarea" rows="3"
+                      placeholder="指定写作角度，留空则使用 AI 建议…"></textarea>
+          </div>
+          <button id="btn-generate" class="btn btn-primary btn-block">
+            ✨ 生成文章
+          </button>
+          <div id="generate-status" class="generate-status"></div>
+        </div>
+      </div>
+
+      <!-- Preview panel -->
+      <div class="preview-panel">
+        <div class="panel-header">
+          <h3>📄 文章预览</h3>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span id="article-char-count" class="text-muted"></span>
+            <div class="preview-tabs">
+              <button class="preview-tab active" data-tab="markdown">Markdown</button>
+              <button class="preview-tab" data-tab="wechat">📱 微信预览</button>
+            </div>
+          </div>
+        </div>
+        <div id="article-preview" class="article-preview">
+          <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <p>点击「生成文章」开始创作</p>
+          </div>
+        </div>
+        <!-- WeChat phone preview -->
+        <div id="wechat-preview" class="wechat-preview" style="display:none">
+          <!-- Formatting toolbar -->
+          <div class="wechat-toolbar">
+            <div class="toolbar-group toolbar-title-group">
+              <span class="toolbar-title">🎨 排版设置</span>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+              <label class="toolbar-label">主题</label>
+              <select id="wechat-theme" class="toolbar-select">
+                <option value="default">经典红金</option>
+                <option value="warm">暖橙生活</option>
+                <option value="business">深蓝商务</option>
+                <option value="minimal">极简黑白</option>
+                <option value="elegant">雅致金棕</option>
+              </select>
+            </div>
+            <div class="toolbar-group">
+              <label class="toolbar-label">字号</label>
+              <div class="toolbar-slider-group">
+                <input type="range" id="wechat-fontsize" class="toolbar-slider"
+                       min="14" max="22" value="15" step="1">
+                <span id="wechat-fontsize-val" class="toolbar-val">15px</span>
+              </div>
+            </div>
+            <div class="toolbar-group">
+              <label class="toolbar-label">强调色</label>
+              <input type="color" id="wechat-accent" class="toolbar-color" value="#CE0E19">
+            </div>
+            <div class="toolbar-group toolbar-actions">
+              <button id="btn-copy-wechat" class="btn btn-outline btn-sm" title="复制 HTML 到剪贴板">📋 复制源码</button>
+              <button id="btn-export-wechat" class="btn btn-primary btn-sm">📥 导出 HTML</button>
+            </div>
+          </div>
+          <div class="phone-frame-wrapper">
+            <div class="phone-frame">
+              <div class="phone-statusbar">
+                <span class="phone-time">9:41</span>
+                <span class="phone-icons">📶 🔋</span>
+              </div>
+              <div class="phone-titlebar">
+                <span class="phone-back">←</span>
+                <span class="phone-title-text">公众号文章</span>
+                <span class="phone-more">•••</span>
+              </div>
+              <div class="phone-article-header">
+                <div class="phone-article-title" id="wechat-title">文章标题</div>
+                <div class="phone-article-meta">
+                  <span id="wechat-date">2026年7月13日</span>
+                </div>
+              </div>
+              <div class="phone-article-body" id="wechat-body">
+                <p class="text-muted">生成文章后在此预览微信效果</p>
+              </div>
+              <div class="phone-article-footer">
+                <span>❤️ 好看</span>
+                <span>⭐ 收藏</span>
+                <span>↗ 分享</span>
+              </div>
+            </div>
+          </div>
+          <!-- Image Position Editor -->
+          <div class="image-position-editor" id="image-position-editor" style="display:none">
+            <h4>🖼️ 配图位置管理 <span style="font-weight:400;font-size:11px;color:var(--text-secondary)">（拖拽排序 / 移除 / 换图）</span></h4>
+            <div class="image-position-list" id="image-position-list">
+              <div class="no-images-hint">暂未生成配图，请先在 Step 3 生成图片</div>
+            </div>
+          </div>
+        </div>
+        <div class="preview-actions" id="preview-actions" style="display:none">
+          <button id="btn-regenerate" class="btn btn-outline">🔄 重新生成</button>
+          <button id="btn-to-step3" class="btn btn-primary">下一步：配图导出 →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- === STEP 3: 配图导出 === -->
+  <section id="step3-panel" class="step-panel">
+    <div class="export-layout">
+      <!-- Cover image -->
+      <div class="image-section">
+        <div class="panel-header">
+          <h3>🖼️ 封面图 <span class="text-muted">(2.35:1)</span></h3>
+          <button id="btn-gen-cover" class="btn btn-outline btn-sm">生成封面</button>
+        </div>
+        <div id="cover-preview" class="image-preview cover-preview">
+          <div class="empty-state small">
+            <p>点击「生成封面」创建公众号首图</p>
+          </div>
+        </div>
+        <div class="image-prompt-editor" id="cover-prompt-editor" style="display:none">
+          <textarea id="cover-prompt-input" class="input-textarea prompt-input"
+                    rows="2" placeholder="编辑图片 Prompt 后重新生成..."></textarea>
+          <div class="prompt-actions">
+            <span id="cover-prompt-label" class="image-prompt-text"></span>
+            <button id="btn-cover-edit" class="btn btn-outline btn-sm">✏️ 编辑 Prompt</button>
+            <button id="btn-cover-regen" class="btn btn-primary btn-sm" style="display:none">🔄 重新生成</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Body images -->
+      <div class="image-section">
+        <div class="panel-header">
+          <h3>📸 正文配图 <span class="text-muted">(3-4 张)</span></h3>
+          <button id="btn-gen-images" class="btn btn-outline btn-sm">生成配图</button>
+        </div>
+        <div id="body-images-preview" class="body-images-grid">
+          <div class="image-slot empty" data-slot="0"><span>图 1</span></div>
+          <div class="image-slot empty" data-slot="1"><span>图 2</span></div>
+          <div class="image-slot empty" data-slot="2"><span>图 3</span></div>
+          <div class="image-slot empty" data-slot="3"><span>图 4</span></div>
+        </div>
+        <div id="body-prompts-editor" class="body-prompts-editor" style="display:none">
+          <!-- Dynamic prompt editors per image -->
+        </div>
+      </div>
+
+      <!-- Export -->
+      <div class="export-section">
+        <div class="panel-header">
+          <h3>📦 导出文章</h3>
+        </div>
+        <div class="export-buttons">
+          <button id="btn-export-docx" class="btn btn-primary">📄 导出 DOCX</button>
+          <button id="btn-export-md" class="btn btn-outline">📥 导出 Markdown</button>
+          <button id="btn-export-html" class="btn btn-outline">🌐 导出 HTML</button>
+          <button id="btn-export-txt" class="btn btn-outline">📄 导出 TXT</button>
+        </div>
+        <div id="export-status" class="export-status"></div>
+      </div>
+    </div>
+
+    <!-- Auto pipeline button -->
+    <div class="auto-pipeline-section">
+      <div class="panel-header">
+        <h3>🚀 一键全流程</h3>
+      </div>
+      <div class="pipeline-controls">
+        <input type="text" id="pipeline-keyword" class="search-input"
+               placeholder="输入关键词，一键搜索→写文→配图…" value="跨境电商 海外仓">
+        <select id="pipeline-style" class="input-select">
+          <option value="b2b">B2B 专业风格</option>
+          <option value="b2c">B2C 亲测风格</option>
+        </select>
+        <button id="btn-auto-pipeline" class="btn btn-primary">
+          ⚡ 一键全流程
+        </button>
+      </div>
+      <div id="pipeline-progress" class="pipeline-progress"></div>
+    </div>
+  </section>
+
+  <!-- Status bar -->
+  <footer class="status-bar">
+    <span id="status-message">🟢 就绪</span>
+
+  </footer>
+</div>
+
+<!-- Markdown parser (simple client-side) -->
+<script src="marked.min.js?v=4"></script>
+<script src="app.js?v=4"></script>
+</body>
+</html>

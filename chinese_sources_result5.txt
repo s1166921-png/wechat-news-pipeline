@@ -1,0 +1,80 @@
+============================================================
+1. CIFNEWS RSS - MULTIPLE APPROACHES
+============================================================
+  YuGuo.xml (Accept: xml): Error: HTTP Error 405: Not Allowed
+  YuGuo.xml (Accept: */*): Error: HTTP Error 405: Not Allowed
+  index.xml: Not RSS (112978 chars)
+  rss.xml: Not RSS (112978 chars)
+  /feed: Error: HTTP Error 404: Not Found
+  /api/rss: Error: HTTP Error 404: Not Found
+  YuGuo.xml (with Referer): Error: HTTP Error 405: Not Allowed
+
+============================================================
+2. EBRUN DATE EXTRACTION
+============================================================
+  Dates matching '\d+月\d+日': ['6月26日', '6月16日', '7月1日', '5月12日']
+
+============================================================
+3. EBRUN ARTICLE DATE (from detail page)
+============================================================
+  com/688435.html: '\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}' = ['2026-07-20 16:27', '2023-06-03 23:59']
+  com/688435.html: '\d{4}-\d{2}-\d{2}' = ['2026-07-20', '2023-06-03']
+  Error: HTTP Error 404: Not Found
+
+============================================================
+4. 360 NEWS SITE: CIFNEWS
+============================================================
+  No results found
+
+============================================================
+5. EBRUN MULTI-KEYWORD TEST
+============================================================
+  '亚马逊 运营': 19 results
+    Prime Day静悄悄 35岁亚马逊运营正在批量"被优化？同时强调亚马逊仍有机会，关键在于转向精细化运营、提升产品力并拥抱AI与合规等新规则，而非固守旧打法。
+    CEVA物流在巴西开设新亚马逊运营中心 日处理包裹13.5万件全球领先的第三方物流公司CEVA Logistics于11月12日在巴西联邦区圣玛丽亚新开设了一家
+    船长BI公布亚马逊运营AI助理CaptainGPT为了帮助卖家提升运营效率并获取更好的销售业绩，船长BI全面接入ChatGPT，基于GPT模型研发出亚马逊运营A
+  'TikTok Shop 美国': 18 results
+    增长超1400%二手苹果产品在TikTokShop美区爆发了TikTok美区二手翻新苹果产品热销，揭示平台内容电商正从低价标品向高解释成本、高信任要求的品类拓展
+    京东收购欧洲零售巨头获批TikTokShop美区降费|邦小白日报京东22亿欧元收购欧洲零售巨头Ceconomy获德国监管放行，TikTokShop美区推出降本返
+    TikTokShop欧区GMV涨8倍 欧盟落地关税新政|邦小白跨境周报TikTokShop欧区GMV同比暴涨8倍并新增8个站点，欧盟与英国相继宣布取消低价值商品
+  '独立站 出海': 18 results
+    Wooshoppaas×AI-Globalpay强强联手！一站式独立站出海方案再升级 破解收单难题！Wooshoppaas一站式独立站出海建站平台与AI-Glo
+    Za品牌出海如何用“AI+数据”帮独立站出海营销提效？AI竞争力访谈Za品牌出海公司70%的员工为 AI 与算法工程师，以“AI+数据”为核心，帮助品牌从0到1
+    奔赴独立站出海玩家航道多元化在南美经营鞋服生意的乔依去年才刚刚开启独立站，目前已经做到了连续3季度盈利。持续稳定的流量让乔依信心...
+  'SHEIN 上市': 21 results
+    SHEIN深圳市找库科技有限公司
+    23点聊电商：天猫更名SHEIN上市字节投极兔 都是假消息|一周电商大事23点电商：截止23点，你错过了哪些电商圈大事儿小情？让我们一起来帮你盘点>>>
+    天猫更名SHEIN上市字节投极兔 都是假消息|一周电商大事SHEIN上市？字节投资极兔？都是假消息！微信内测新电商！字节出海独立站关停！天猫开始做自营！
+
+============================================================
+6. INTEGRATION PLAN
+============================================================
+
+✓ CAN INTEGRATE:
+  [1] 亿邦动力 (m.ebrun.com)
+      - Search: m.ebrun.com/search?keyword=XXX
+      - Articles: m.ebrun.com/{id}.html (full text accessible)
+      - E-commerce focused, high relevance
+      - Need to solve: date extraction from article pages
+
+  [2] 36Kr RSS (36kr.com/feed)
+      - 30 fresh items per fetch
+      - General tech/business, some cross-border coverage
+      - Date in RSS pubDate field
+      - Cannot search by keyword (must filter from feed)
+
+  [3] 雨果跨境 Homepage (cifnews.com)
+      - 55 articles on homepage
+      - RSS feed blocked (405)
+      - JS-rendered search page
+      - Can scrape homepage for latest articles
+
+✗ CANNOT:
+  - 雨果跨境 RSS (405 Not Allowed)
+  - Baidu News (ANTIBOT)
+  - Bing News (JS-rendered)
+  - Most Chinese portals (JS-rendered)
+
+CURRENT ENGINES: 360 News + Sogou News + Bing Web + Google News
+NEW ENGINES TO ADD: 亿邦动力 + 36Kr RSS + 雨果跨境首页
+

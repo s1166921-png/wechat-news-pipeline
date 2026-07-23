@@ -1,0 +1,106 @@
+============================================================
+1. EBRUN MOBILE DEEP
+============================================================
+  Article links found: 868
+    桌面创客工具破圈：3D打印机爆火  到底谁在买？
+    → https://m.ebrun.com/687356.html
+    不讲“低价” 只卖“新鲜”   线下零食行业又现新物种？
+    → https://m.ebrun.com/687198.html
+    翻倍增长背后 一份跨境电商难得的“高分答卷”
+    → https://m.ebrun.com/687030.html
+    一家篮球工厂  如何抢到了世界杯足球订单？
+    → https://m.ebrun.com/687199.html
+    谁说“男人消费不如狗？”  有男装品牌三个月卖5亿
+    → https://m.ebrun.com/686823.html
+    7月30日起电子口岸取消出口退税专用报关单打印预览功能
+    → https://m.ebrun.com/ebrungo/zb/688562.html
+    TikTok Shop体育纪念品销量半年增长136%
+    → https://m.ebrun.com/ebrungo/zb/688561.html
+    AWS计费系统出现漏洞 部分客户控制台显示数十亿美元异常账单
+    → https://m.ebrun.com/ebrungo/zb/688560.html
+    报告：腾讯WorkBuddy在国内PC端AI原生办公智能体市场6月单月访问量破2000万
+    → https://m.ebrun.com/ebrungo/zb/688558.html
+    新能源汽车维修作业安全国标8月施行
+    → https://m.ebrun.com/ebrungo/zb/688557.html
+
+  Trying search patterns...
+    https://m.ebrun.com/search?keyword=temu%20%E8%B7%A8%E5%A2%83%E7%94%B5%: 22 links
+      卓志广东卓志跨境电商供应链服务有限公司
+      TikTok多国社交购物渗透率超Facebook与Instagram 丨跨境电商周报TikTok多国社交购物渗透率超Facebook与Ins
+      韩国完善跨境电商监管体系 要求Temu、AliExpress、Shein等平台指定境内代表韩国内阁已批准全面电子商务监管框架改革方案，旨在弥
+    https://m.ebrun.com/search?q=temu%20%E8%B7%A8%E5%A2%83%E7%94%B5%E5%95%: 1 links
+      京公网安备11010602006906号
+    https://m.ebrun.com/search/temu%20%E8%B7%A8%E5%A2%83%E7%94%B5%E5%95%86: HTTP Error 404: Not Found
+    https://m.ebrun.com/so?q=temu%20%E8%B7%A8%E5%A2%83%E7%94%B5%E5%95%86: HTTP Error 404: Not Found
+
+============================================================
+2. CIFNEWS VIA SEARCH ENGINES
+============================================================
+  360 site:cifnews.com results: 0
+
+  Sogou site:cifnews.com results: 0
+
+============================================================
+3. CIFNEWS RSS PAGE PARSE
+============================================================
+  RSS-related links: 7
+     → //add.my.yahoo.com/rss?url=https://www.cifnews.com/xmlconfig/YuGuo.xml
+     → //www.xianguo.com/subscribe.php?url=https://www.cifnews.com/xmlconfig/YuGuo.xml
+     → //www.zhuaxia.com/add_channel.php?url=https://www.cifnews.com/xmlconfig/YuGuo.xml
+     → //r.qq.com/cgi-bin/reader_switch?u=https://www.cifnews.com/xmlconfig/YuGuo.xml
+     → //my.msn.com/Addrss.aspx?P=1&url=https://www.cifnews.com/xmlconfig/YuGuo.xml
+     → //i.yodao.com/?feed=https://www.cifnews.com/xmlconfig/YuGuo.xml
+     → https://www.cifnews.com/rss
+  Feed URLs from HTML: ['https://www.cifnews.com/rss']
+
+============================================================
+4. 36KR SEARCH VIA RSS (keyword filter)
+============================================================
+  Matched 3/30 items for 'temu 跨境电商'
+    [2026-07-20 09:30:27  +080] 腾讯云ADP 4.0海外版发布，要把企业级智能体带到全球市场 | 最前线
+    → https://36kr.com/p/3901396207584902?f=rss
+    [2026-07-20 08:05:13  +080] 8点1氪丨长鑫科技中签号出炉：共约770.22万个；西班牙1-0战胜阿根廷，夺得本届世界杯冠军；月之暗面有望最快6个月内赴港上市
+    → https://36kr.com/p/3903220264404608?f=rss
+    [2026-07-20 15:46:42  +080] 万兴科技推出“万剧出海创投计划”，牵头成立“万剧出海共创联盟”
+    → https://36kr.com/newsflashes/3903670343075459?f=rss
+
+============================================================
+5. MORE RSS FEEDS
+============================================================
+  亿邦动力 RSS: Error: HTTP Error 403: Forbidden
+  亿邦动力 RSS2: Error: HTTP Error 404: Not Found
+  凤凰网科技 RSS: ✗ Not feed (16546 chars, starts: <!doctype html><html xmlns:wb="http://open.weibo.com/wb"><he)
+  澎湃新闻 RSS: ✗ Not feed (50238 chars, starts: <!DOCTYPE html><html><head><meta charSet="utf-8"/><meta name)
+  界面新闻 RSS: Error: HTTP Error 404: Not Found
+  品玩 RSS: Error: HTTP Error 405: Not Allowed
+  环球网 RSS: ✗ Not feed (984 chars, starts: <script>function a(a){function n(){for(var a={wQzOV:_0x649a()
+  雨果跨境 sitemap: ✓ RSS/XML, 0 items
+  雨果跨境 category feeds: Error: HTTP Error 404: Not Found
+
+============================================================
+6. BING SITE: SEARCH FOR CROSS-BORDER NEWS
+============================================================
+  site:cifnews.com: 10 results
+    Temu跨境电商详解：新人入局指南+运营实操（2026最新）
+    Temu跨境电商个人能做吗？2026年3月最新条件与实操指南
+    Temu- 百度百科
+  site:ebrun.com: 10 results
+    Temu跨境电商详解：新人入局指南+运营实操（2026最新）
+    Temu跨境电商个人能做吗？2026年3月最新条件与实操指南
+    Temu- 百度百科
+  site:kjzd.com: 10 results
+    Temu跨境电商详解：新人入局指南+运营实操（2026最新）
+    Temu跨境电商个人能做吗？2026年3月最新条件与实操指南
+    Temu- 百度百科
+  site:baijing.cn: 10 results
+    Temu跨境电商详解：新人入局指南+运营实操（2026最新）
+    Temu跨境电商个人能做吗？2026年3月最新条件与实操指南
+    Temu- 百度百科
+  site:dny123.com: 10 results
+    Temu跨境电商详解：新人入局指南+运营实操（2026最新）
+    Temu跨境电商个人能做吗？2026年3月最新条件与实操指南
+    Temu- 百度百科
+  site:amz123.com: 10 results
+    Temu跨境电商详解：新人入局指南+运营实操（2026最新）
+    Temu跨境电商个人能做吗？2026年3月最新条件与实操指南
+    Temu- 百度百科

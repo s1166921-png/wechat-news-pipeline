@@ -1,0 +1,112 @@
+============================================================
+1. CIFNEWS DEEP DIVE
+============================================================
+  No API endpoints found in HTML
+
+  Trying listing pages...
+    https://www.cifnews.com/news: Error: HTTP Error 404: Not Found
+    https://www.cifnews.com/article: Error: HTTP Error 404: Not Found
+    https://www.cifnews.com/category/1: Error: HTTP Error 404: Not Found
+    https://www.cifnews.com/: 55 article links
+      欧洲40℃热浪引爆睡眠经济！这12款产品正在疯狂出单
+      二手奢侈品出海，从一条朋友圈开始……丨“新”卖家故事③
+      迷雾中的分水岭：2026中国出海半年盘点与下半年展望
+
+============================================================
+2. 36KR RSS FULL EXTRACTION
+============================================================
+  Total items: 30
+  [0] 专访靳玉志：「境」和「界」并不冲突，共同落实「电子螺丝钉」的战略定位
+      date=2026-07-20 12:32:43  +0800 url=https://36kr.com/p/3902068392658566?f=rss
+  [1] 在WAIC地下一层找机会的年轻人：光鲜是过去，眼下是生存
+      date=2026-07-20 11:02:32  +0800 url=https://36kr.com/p/3903396279125888?f=rss
+  [2] 谁还在卷参数？WAIC2026全是能干活的实体AI！
+      date=2026-07-20 10:49:41  +0800 url=https://36kr.com/p/3903383663478403?f=rss
+  [3] 从“连得上”到“算得懂”，天基通算融合初创公司押注无人系统，首轮融资数千万元｜36氪首发
+      date=2026-07-20 10:30:06  +0800 url=https://36kr.com/p/3903365398185857?f=rss
+  [4] 腾讯云ADP 4.0海外版发布，要把企业级智能体带到全球市场 | 最前线
+      date=2026-07-20 09:30:27  +0800 url=https://36kr.com/p/3901396207584902?f=rss
+  [5] 从烤披萨到拿快递，满场跑的机器人终于要进你家了｜WAIC 2026全面探展
+      date=2026-07-20 09:20:44  +0800 url=https://36kr.com/p/3902007640459145?f=rss
+  [6] 红熊AI完成数亿元A+轮融资，基于AI“记忆科学”从To B服务延伸至To C应用｜36氪首发
+      date=2026-07-20 09:00:00  +0800 url=https://36kr.com/p/3899612612494976?f=rss
+  [7] 8点1氪丨长鑫科技中签号出炉：共约770.22万个；西班牙1-0战胜阿根廷，夺得本届世界杯冠军；月之暗面有望最快6个月内赴港上市
+      date=2026-07-20 08:05:13  +0800 url=https://36kr.com/p/3903220264404608?f=rss
+  [8] 科氪 | 从生命预警到七诊合参，安顿“双核首发”的技术密码
+      date=2026-07-19 18:35:30  +0800 url=https://36kr.com/p/3902428274427525?f=rss
+  [9] 9点1氪丨ofo停更5年突然发文，运营主体仍处存续状态；苹果市值重返全球第一；乐事回应“蓝色薯片”来源
+      date=2026-07-18 09:05:45  +0800 url=https://36kr.com/p/3900449325287305?f=rss
+  [10] 港交所回应考虑延长股票交易时间
+      date=2026-07-20 16:12:20  +0800 url=https://36kr.com/newsflashes/3903703299769988?f=rss
+  [11] 恒指收涨2.36%，恒生科技指数涨2.79%
+      date=2026-07-20 16:10:53  +0800 url=https://36kr.com/newsflashes/3903701861320583?f=rss
+  [12] 市场监管总局：2027年年底前，进一步降低个体工商户数字化转型成本
+      date=2026-07-20 16:07:18  +0800 url=https://36kr.com/newsflashes/3903698347099778?f=rss
+  [13] 市场监管总局：合理降低佣金、抽成、会员费等费用，减轻个体工商户运营初期成本压力
+      date=2026-07-20 16:06:56  +0800 url=https://36kr.com/newsflashes/3903697991468933?f=rss
+  [14] 国网英大：出售英大期货全部股权获得证监会核准批复
+      date=2026-07-20 16:04:44  +0800 url=https://36kr.com/newsflashes/3903686068569731?f=rss
+
+============================================================
+3. 36KR SEARCH
+============================================================
+  Error: HTTP Error 404: Not Found
+
+============================================================
+4. EBRUN (亿邦动力) ALTERNATIVES
+============================================================
+  https://www.ebrun.com/: Error: HTTP Error 403: Forbidden
+  https://m.ebrun.com/: 868 links
+    桌面创客工具破圈：3D打印机爆火  到底谁在买？
+    不讲“低价” 只卖“新鲜”   线下零食行业又现新物种？
+    翻倍增长背后 一份跨境电商难得的“高分答卷”
+  https://so.ebrun.com/search?keyword=temu%20%E8%B7%A8%E5%A2%83%E7%94%B5%E5%95%86: Error: <urlopen error [Errno -2] Name or service not known>
+
+============================================================
+5. MORE CHINESE SOURCES
+============================================================
+  凤凰网: 268 total links, 16 article-like
+    大新闻大历史|英国换相能否拯救脱欧困局？
+    → https://phtv.ifeng.com/channel/history/1551432
+    政策与需求同频共振 深圳“好房子”激活住房消费
+    → https://house.ifeng.com/news/2026_07_20-57441125_0.shtml
+    从金融属性回归居住本质 深圳“中国第一高楼”重获新生
+    → https://house.ifeng.com/news/2026_07_20-57441126_0.shtml
+  界面新闻: Error: HTTP Error 404: Not Found
+  澎湃新闻: 3 total links, 3 article-like
+    报料邮箱: news@thepaper.cn
+    → mailto:news@thepaper.cn
+    沪ICP备14003370号
+    → https://beian.miit.gov.cn
+    沪公网安备31010602000299号
+    → https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010602000299
+  环球网: Error: HTTP Error 403: Forbidden
+  虎嗅: 0 total links, 0 article-like
+  品玩: Error: HTTP Error 405: Not Allowed
+  钛媒体: 8 total links, 8 article-like
+    support@tmtpost.com
+    → mailto:support@tmtpost.com
+    WAIC 2026世界人工智能大会
+    → /search?q=WAIC 2026世界人工智能大会
+    iOS & Android
+    → javascript:;
+
+============================================================
+6. CROSS-BORDER E-COMMERCE SPECIFIC
+============================================================
+  AMZ123: 363 total links, 10 article-like
+    TikTok Shop
+    → https://seller.tiktokglobalshop.com/account/register?channel=us_partner_TT123
+    【东莞】刘润亲临 讲你听得懂的AI+跨境2026-07-28广东省东莞市
+    → https://www.amz123.com/hd/yBZ51boT
+    Wayfair全品类招商城市巡回Workshop（深圳站）2026-07-29广东省深圳市
+    → https://www.amz123.com/hd/cWI0FT4Q
+  出海笔记: Error: HTTP Error 404: Not Found
+  跨境眼: Error: HTTP Error 404: Not Found
+  DNY123: 3 total links, 3 article-like
+    TikTok广告免费开户
+    → https://www.dny123.com/guanggaokaihu
+    闽ICP备2022007330号
+    → http://beian.miit.gov.cn/
+    闽ICP备2022007330号
+    → http://beian.miit.gov.cn/

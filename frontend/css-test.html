@@ -1,0 +1,78 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CSS Specificity Test</title>
+<style>
+/* Copy the exact CSS from style.css */
+.phone-article-body p { font-size: 15px; color: #3e3e3e; line-height: 1.9; margin: 0 0 14px; letter-spacing: .5px; text-align: justify; word-break: break-all; }
+.phone-article-body strong { color: #CE0E19; font-weight: 600; }
+.phone-article-body h1 { font-size: 20px; font-weight: 700; color: #1a1a1a; margin: 20px 0 14px; padding-left: 12px; border-left: 4px solid #CE0E19; line-height: 1.4; }
+.phone-article-body h2 { font-size: 17px; font-weight: 700; color: #1a1a1a; margin: 22px 0 12px; line-height: 1.4; padding-bottom: 6px; border-bottom: 1px solid #f0f0f0; }
+.phone-article-body a { color: #CE0E19; text-decoration: none; border-bottom: 1px solid #CE0E19; }
+.phone-article-body code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 90%; color: #CE0E19; }
+.phone-article-body li { font-size: 15px; color: #3e3e3e; line-height: 1.8; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h2>Test: Inline styles vs CSS class selectors</h2>
+<div id="wechat-body" class="phone-article-body">
+  <p>Waiting for test...</p>
+</div>
+<button onclick="testFontSize(14)">font_size=14 (red)</button>
+<button onclick="testFontSize(22)">font_size=22 (blue)</button>
+<button onclick="testFontSize(18)">font_size=18 (green)</button>
+<div id="result" style="margin-top:10px;padding:10px;background:#f0f0f0"></div>
+
+<script>
+var testContent = "# Test Title\n\nThis is **bold text** and a [link](https://example.com).\n\n## Section 2\n\nNormal paragraph with `code` inline.\n\n- List item with **bold**\n- Another item";
+
+async function testFontSize(fs) {
+  var accent = fs === 22 ? '#0000FF' : fs === 14 ? '#FF0000' : '#00AA00';
+  var r = await fetch('http://127.0.0.1:8888/api/to-wechat-html', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      content: testContent,
+      title: 'Test',
+      theme: 'default',
+      font_size: fs,
+      accent_color: accent
+    })
+  });
+  var d = await r.json();
+  var bodyMatch = d.html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  var bodyHtml = bodyMatch ? bodyMatch[1] : d.html;
+  document.getElementById('wechat-body').innerHTML = bodyHtml;
+  
+  // Check actual computed styles
+  setTimeout(function() {
+    var p = document.querySelector('#wechat-body p');
+    var strong = document.querySelector('#wechat-body strong');
+    var a = document.querySelector('#wechat-body a');
+    var h1 = document.querySelector('#wechat-body h1');
+    var h2 = document.querySelector('#wechat-body h2');
+    var code = document.querySelector('#wechat-body code');
+    
+    var csP = p ? getComputedStyle(p).fontSize : 'N/A';
+    var csStrong = strong ? getComputedStyle(strong).color : 'N/A';
+    var csA = a ? getComputedStyle(a).color : 'N/A';
+    var csH1 = h1 ? getComputedStyle(h1).fontSize : 'N/A';
+    var csH2 = h2 ? getComputedStyle(h2).fontSize : 'N/A';
+    var csCode = code ? getComputedStyle(code).color : 'N/A';
+    
+    var result = 'font_size=' + fs + ' accent=' + accent + '\n';
+    result += 'P font-size: ' + csP + ' (expect ' + fs + 'px)\n';
+    result += 'Strong color: ' + csStrong + ' (expect ' + accent + ')\n';
+    result += 'Link color: ' + csA + ' (expect ' + accent + ')\n';
+    result += 'H1 font-size: ' + csH1 + ' (expect ' + (fs+7) + 'px)\n';
+    result += 'H2 font-size: ' + csH2 + ' (expect ' + (fs+3) + 'px)\n';
+    result += 'Code color: ' + csCode + ' (expect ' + accent + ')';
+    
+    document.getElementById('result').innerText = result;
+    console.log(result);
+  }, 100);
+}
+</script>
+</body>
+</html>

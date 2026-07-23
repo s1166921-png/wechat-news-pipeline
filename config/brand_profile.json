@@ -1,0 +1,57 @@
+{
+  "company": {
+    "name": "美鸥跨境贸易服务（深圳）集团有限公司",
+    "short_name": "美鸥跨境",
+    "brand_name_en": "USAEU",
+    "domain": "https://www.usaeu.com/",
+    "founded_year": 2013,
+    "headquarters": "深圳",
+    "description": "国内成立较早的跨境电商全链条服务企业，累计服务超50万家跨境卖家。"
+  },
+  "b2b": {
+    "core_products": [
+      {"name": "国际知识产权服务", "category": "知识产权", "description": "国际商标注册、专利申请、品牌保护"},
+      {"name": "欧洲税务合规", "category": "税务", "description": "欧盟VAT注册与申报、税务筹划与合规管理"},
+      {"name": "产品合规认证", "category": "合规", "description": "产品安全认证、气候友好绿标"},
+      {"name": "海外工商服务", "category": "工商", "description": "海外公司注册、境外银行开户"},
+      {"name": "美鸥RPA智能运营", "category": "SaaS工具", "description": "跨境电商自动化运营工具"},
+      {"name": "美鸥海外仓", "category": "仓储物流", "description": "海外仓储配送、FBA中转、一件代发"},
+      {"name": "美鸥供应链/头程物流", "category": "物流", "description": "跨境头程运输、供应链管理"},
+      {"name": "跨境保险", "category": "金融保险", "description": "亚马逊店铺保险等跨境保险产品"},
+      {"name": "申诉业务", "category": "运营支持", "description": "平台账号申诉、Listing恢复"}
+    ],
+    "selling_points": [
+      {"headline": "一站式降本增效", "description": "覆盖知识产权、税务、合规、物流、仓储全链条，无需对接多家供应商"},
+      {"headline": "跨境合规零风险", "description": "欧洲税务合规 + 产品安全认证 + 气候绿标，避免封号/罚款"},
+      {"headline": "50万+卖家验证", "description": "累计服务超50万家跨境卖家，系统稳定可靠"},
+      {"headline": "主流平台官方合作", "description": "亚马逊、速卖通、Temu、TikTok等平台官方合作服务商"},
+      {"headline": "全生命周期覆盖", "description": "公司注册→商标专利→税务合规→产品认证→物流仓储→保险"}
+    ],
+    "content_pillars": [
+      "跨境电商合规指南", "欧洲VAT税务解读", "亚马逊气候绿标认证",
+      "海外商标注册攻略", "跨境电商自动化运营", "FBA物流与海外仓优化"
+    ]
+  },
+  "b2c": {
+    "services": [
+      {"name": "国际商标注册", "one_liner": "几百块注册海外商标，保护你的品牌", "ideal_for": "刚起步的个人品牌卖家"},
+      {"name": "VAT税务代办", "one_liner": "欧洲税务帮你搞定，不用自己研究法规", "ideal_for": "做欧洲站的个人卖家"},
+      {"name": "气候绿标认证", "one_liner": "拿绿标=流量加持，亚马逊免费流量入口", "ideal_for": "想做差异化、拿流量的卖家"},
+      {"name": "美鸥RPA工具", "one_liner": "自动化运营，选品/分析/报表不用手动了", "ideal_for": "一个人管多店铺的效率党"},
+      {"name": "海外仓一件代发", "one_liner": "不用备货到海外，出一单发一单", "ideal_for": "测款期和资金有限的个人卖家"},
+      {"name": "跨境保险", "one_liner": "亚马逊要求必买保险，美鸥直接帮你搞定", "ideal_for": "所有亚马逊卖家"},
+      {"name": "账号申诉", "one_liner": "账号被封？专业申诉团队帮你救回来", "ideal_for": "遇到封号问题的卖家"}
+    ],
+    "selling_points": [
+      {"headline": "0门槛跨境出海", "description": "不需要懂外语、不需要海外公司，个人卖家也能快速启动"},
+      {"headline": "流程极简", "description": "线上提交资料，进度实时可查，告别繁琐纸质流程"},
+      {"headline": "小卖家也负担得起", "description": "按需付费、服务分档灵活，几百元就能注册商标"},
+      {"headline": "RPA自动化", "description": "自动处理选品分析、Listing优化、报表生成，一个人顶一个团队"},
+      {"headline": "封号救星", "description": "账号申诉、Listing恢复一键提交，专业团队对接平台"}
+    ],
+    "content_tone": {
+      "voice": "亲切、接地气、干货感",
+      "style": "教程式 + 避坑指南 + 案例故事"
+    }
+  }
+}

@@ -1,0 +1,112 @@
+======================================================================
+TESTING CHINESE NEWS SOURCES
+======================================================================
+
+--- 雨果跨境-搜索 ---
+  Status: EMPTY_HTML
+  Error: HTML 23682 chars but no article links found
+
+--- 雨果跨境-API尝试 ---
+  Status: ERROR
+  Error: HTTP Error 404: Not Found
+
+--- 雨果跨境-API-v2 ---
+  Status: ERROR
+  Error: HTTP Error 404: Not Found
+
+--- 亿邦动力 ---
+  Status: ERROR
+  Error: HTTP Error 403: Forbidden
+
+--- 跨境知道 ---
+  Status: EMPTY_HTML
+  Error: HTML 10043 chars but no article links found
+
+--- 卖家之家 ---
+  Status: SUCCESS
+  Found: 8 results
+  [0] {{section.content}}
+      url: javascript:;
+  [1] GeeLark云手机  TK账号轻松管理
+      url: https://app.geelark.cn/#/register?invite_code=mjzjcom
+  [2] TikTok美区热招 抢占内容电商
+      url: https://mjzj.com/shop/platform/doqvdpami6m8
+
+--- 白鲸出海 ---
+  Status: EMPTY_HTML
+  Error: HTML 6970 chars but no article links found
+
+--- 中国日报-跨境 ---
+  Status: ERROR
+  Error: HTTP Error 400: Bad Request
+
+--- 36氪-v2 ---
+  Status: EMPTY_HTML
+  Error: HTML 44896 chars but no article links found
+
+--- 搜狗微信 ---
+  Status: EMPTY_HTML
+  Error: HTML 32965 chars but no article links found
+
+--- 网易新闻 ---
+  Status: ERROR
+  Error: HTTP Error 404: Not Found
+
+--- 搜狐新闻 ---
+  Status: EMPTY_HTML
+  Error: Short HTML: 1119 chars
+
+--- 新浪新闻 ---
+  Status: EMPTY_HTML
+  Error: Short HTML: 435 chars
+
+--- 腾讯新闻 ---
+  Status: EMPTY_HTML
+  Error: HTML 7122 chars but no article links found
+
+======================================================================
+SUMMARY
+======================================================================
+
+✓ SUCCESS (1):
+    卖家之家                 → 8 results
+
+✗ EMPTY/JS-RENDERED (8):
+    雨果跨境-搜索              → HTML 23682 chars but no article links found
+    跨境知道                 → HTML 10043 chars but no article links found
+    白鲸出海                 → HTML 6970 chars but no article links found
+    36氪-v2               → HTML 44896 chars but no article links found
+    搜狗微信                 → HTML 32965 chars but no article links found
+    搜狐新闻                 → Short HTML: 1119 chars
+    新浪新闻                 → Short HTML: 435 chars
+    腾讯新闻                 → HTML 7122 chars but no article links found
+
+🚫 ANTIBOT (0):
+
+❌ ERROR (5):
+    雨果跨境-API尝试           → HTTP Error 404: Not Found
+    雨果跨境-API-v2          → HTTP Error 404: Not Found
+    亿邦动力                 → HTTP Error 403: Forbidden
+    中国日报-跨境              → HTTP Error 400: Bad Request
+    网易新闻                 → HTTP Error 404: Not Found
+
+
+=== Bonus: RSS/Sitemap checks ===
+  雨果跨境 RSS: Not RSS (length 114328, starts: 
+<!DOCTYPE html>
+<html>
+<head>
+<title>RSS订阅-雨果网</title>
+<meta name="keywords" />)
+  雨果跨境 RSS2: Error: HTTP Error 404: Not Found
+  亿邦动力 RSS: Error: HTTP Error 403: Forbidden
+  36氪 RSS: RSS/XML found! 86994 chars
+    Items: 30
+    - 专访靳玉志：「境」和「界」并不冲突，共同落实「电子螺丝钉」的战略定位
+    - 在WAIC地下一层找机会的年轻人：光鲜是过去，眼下是生存
+    - 谁还在卷参数？WAIC2026全是能干活的实体AI！
+  白鲸出海 Sitemap: Not RSS (length 6970, starts: <!DOCTYPE html>
+<html>
+
+<head>
+	<meta content="text/html;charset=utf-8" http-equ)
