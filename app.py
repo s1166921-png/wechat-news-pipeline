@@ -2406,6 +2406,75 @@ def serve_config(filename):
     return send_from_directory(str(CONFIG_DIR), filename)
 
 
+@app.route("/api/generated-image")
+def serve_generated_image():
+    """Serve generated images saved under output/images."""
+    filename = request.args.get("file", "")
+    if not filename:
+        return jsonify({"error": "file required"}), 400
+    return send_from_directory(str(OUTPUT_DIR / "images"), filename)
+
+
+def _public_output_image_url(save_path):
+    """Return the browser/API URL for a generated image path."""
+    from urllib.parse import quote
+
+    return f"/api/generated-image?file={quote(Path(save_path).name)}"
+
+
+def _image_ref_url(value):
+    """Normalize image refs from old string format or new object format."""
+    if isinstance(value, dict):
+        return (
+            value.get("local_url")
+            or value.get("url")
+            or value.get("image_url")
+            or ""
+        )
+    return value or ""
+
+
+def _local_output_image_path_from_url(url):
+    """Resolve a public /output/images URL or local path to a safe local file."""
+    from urllib.parse import parse_qs, unquote, urlparse
+
+    if not url:
+        return None
+
+    raw = str(url)
+    parsed = urlparse(raw)
+    path_part = parsed.path if parsed.scheme in ("http", "https") else raw.split("?", 1)[0]
+    if path_part == "/api/generated-image":
+        query = parsed.query
+        if not query and "?" in raw:
+            query = raw.split("?", 1)[1]
+        params = parse_qs(query)
+        filename = unquote((params.get("file") or [""])[0])
+        candidate = (OUTPUT_DIR / "images" / filename).resolve()
+        images_root = (OUTPUT_DIR / "images").resolve()
+        try:
+            candidate.relative_to(images_root)
+        except ValueError:
+            return None
+        return candidate if candidate.is_file() else None
+
+    public_prefixes = ("/api/generated-images/", "/generated-images/", "/output/images/")
+    matched_prefix = next((prefix for prefix in public_prefixes if path_part.startswith(prefix)), None)
+    if matched_prefix:
+        filename = unquote(path_part[len(matched_prefix):])
+        candidate = (OUTPUT_DIR / "images" / filename).resolve()
+    else:
+        candidate = Path(raw).expanduser().resolve()
+
+    images_root = (OUTPUT_DIR / "images").resolve()
+    try:
+        candidate.relative_to(images_root)
+    except ValueError:
+        return None
+
+    return candidate if candidate.is_file() else None
+
+
 @app.route("/api/health", methods=["GET"])
 def api_health():
     return jsonify({
@@ -3068,14 +3137,17 @@ def api_generate_cover():
 
     # Download locally
     saved = []
+    local_urls = []
     for i, url in enumerate(urls):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         save_path = OUTPUT_DIR / "images" / f"cover_{timestamp}_{i}.png"
         if _download_image(url, save_path):
             saved.append(str(save_path))
+            local_urls.append(_public_output_image_url(save_path))
 
     return jsonify({
-        "prompt": prompt, "image_urls": urls,
+        "prompt": prompt, "image_urls": local_urls or urls,
+        "external_image_urls": urls, "local_image_urls": local_urls,
         "saved_paths": saved, "image_type": "cover",
     })
 
@@ -3101,13 +3173,16 @@ def api_generate_image():
             print(f"  [Image {i+1}] Custom prompt: {cp[:80]}...")
             urls = _generate_ark_image(cp, size="body", n=1)
             saved = []
+            local_urls = []
             for j, url in enumerate(urls):
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 save_path = OUTPUT_DIR / "images" / f"body_{timestamp}_{i}_{j}.png"
                 if _download_image(url, save_path):
                     saved.append(str(save_path))
+                    local_urls.append(_public_output_image_url(save_path))
             results.append({
-                "index": i, "prompt": cp, "image_urls": urls,
+                "index": i, "prompt": cp, "image_urls": local_urls or urls,
+                "external_image_urls": urls, "local_image_urls": local_urls,
                 "saved_paths": saved, "section_excerpt": cp[:100],
             })
         return jsonify({"images": results, "total": len(results)})
@@ -3124,14 +3199,17 @@ def api_generate_image():
         urls = _generate_ark_image(prompt, size="body", n=1)
 
         saved = []
+        local_urls = []
         for j, url in enumerate(urls):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path = OUTPUT_DIR / "images" / f"body_{timestamp}_{i}_{j}.png"
             if _download_image(url, save_path):
                 saved.append(str(save_path))
+                local_urls.append(_public_output_image_url(save_path))
 
         results.append({
-            "index": i, "prompt": prompt, "image_urls": urls,
+            "index": i, "prompt": prompt, "image_urls": local_urls or urls,
+            "external_image_urls": urls, "local_image_urls": local_urls,
             "saved_paths": saved, "section_excerpt": section[:100],
         })
 
@@ -3474,7 +3552,11 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
                 return (int(k), "")
             except (ValueError, TypeError):
                 return (9999, k)
-        img_urls = [v for k, v in sorted(images.items(), key=_img_sort_key) if v]
+        img_urls = [
+            _image_ref_url(v)
+            for k, v in sorted(images.items(), key=_img_sort_key)
+            if _image_ref_url(v)
+        ]
         if img_urls:
             # Find all paragraph-ending positions
             end_positions = [m.end() for m in _re.finditer(
@@ -4319,6 +4401,14 @@ def _build_docx(content, title, images):
     # ── 下载图片辅助函数 ──
     def _download_image(url):
         """下载图片返回 BytesIO，失败返回 None。"""
+        local_path = _local_output_image_path_from_url(url)
+        if local_path:
+            try:
+                return BytesIO(local_path.read_bytes())
+            except Exception as e:
+                print(f"  [DOCX] 本地图片读取失败: {e}")
+                return None
+
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             resp = urllib.request.urlopen(req, timeout=30)

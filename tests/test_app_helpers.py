@@ -1,4 +1,7 @@
 import unittest
+from zipfile import ZipFile
+from base64 import b64decode
+from io import BytesIO
 from datetime import datetime
 from unittest.mock import patch
 
@@ -243,6 +246,59 @@ class VerifyWechatLinksEndpointTests(unittest.TestCase):
         self.assertEqual(data["usable_count"], 1)
         self.assertNotIn("content", data["results"][0])
         self.assertEqual(data["results"][0]["quality"]["usable"], True)
+
+
+class ImageEmbeddingTests(unittest.TestCase):
+    def test_wechat_html_embeds_body_image_object_url(self):
+        html = app._markdown_to_wechat_html(
+            "第一段内容。\n\n第二段内容。\n\n第三段内容。\n\n第四段内容。\n\n第五段内容。",
+            images={
+                "cover": "/api/generated-image?file=cover.png",
+                "0": {
+                    "url": "/api/generated-image?file=body.png",
+                    "section_excerpt": "第二段内容",
+                },
+            },
+        )
+
+        self.assertIn('src="/api/generated-image?file=cover.png"', html)
+        self.assertIn('src="/api/generated-image?file=body.png"', html)
+        self.assertNotIn("{'url':", html)
+
+    def test_export_docx_accepts_local_output_image_url(self):
+        client = app.app.test_client()
+        image_dir = app.OUTPUT_DIR / "images"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "unit_test_docx_image.png"
+        image_path.write_bytes(b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8"
+            "/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        ))
+
+        response = client.post("/api/export-docx", json={
+            "title": "测试文档",
+            "content": "## 小标题\n\n这是一段用于导出的正文。",
+            "images": {
+                "cover": "/api/generated-image?file=unit_test_docx_image.png",
+                "0": {
+                    "url": "/api/generated-image?file=unit_test_docx_image.png",
+                    "section_excerpt": "用于导出的正文",
+                },
+            },
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.mimetype,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        self.assertGreater(len(response.data), 1000)
+        with ZipFile(BytesIO(response.data)) as docx_zip:
+            media_files = [
+                name for name in docx_zip.namelist()
+                if name.startswith("word/media/")
+            ]
+        self.assertGreaterEqual(len(media_files), 1)
 
 
 class FetchArticleEndpointTests(unittest.TestCase):
