@@ -3651,15 +3651,17 @@ def _fetch_article_content(url):
                         if title_m:
                             title = title_m.group(1).strip()
 
-                print(f"  [Fetch] trafilatura OK: {len(result)} chars, title={title[:40]}")
-                return {
-                "title": title or "未知标题",
-                "author": author,
-                "content": result.strip(),
-                "char_count": len(result.strip()),
-                "source_url": url,
-                "extraction_method": "trafilatura",
-            }
+                if not _core_extractors.is_usable_article_content(result, url):
+                    print(f"  [Fetch] trafilatura content incomplete after cleanup, falling back...")
+                else:
+                    print(f"  [Fetch] trafilatura OK: {len(result)} chars, title={title[:40]}")
+                    return _core_extractors.article_success(
+                        title=title or "未知标题",
+                        author=author,
+                        content=result,
+                        source_url=url,
+                        extraction_method="trafilatura",
+                    )
     except Exception as e:
         print(f"  [Fetch] trafilatura failed: {e}")
 
@@ -3704,15 +3706,17 @@ def _fetch_article_content(url):
                         _t_m = _re.search(r"<title>([^<]+)</title>", _cc_html)
                         if _t_m:
                             _cc_title = _t_m.group(1).strip()
-                print(f"  [Fetch] curl_cffi OK: {len(_cc_content)} chars, title={_cc_title[:40]}")
-                return {
-                    "title": _cc_title or "未知标题",
-                    "author": _cc_author,
-                    "content": _cc_content.strip(),
-                    "char_count": len(_cc_content.strip()),
-                    "source_url": url,
-                    "extraction_method": "curl_cffi",
-                }
+                if not _core_extractors.is_usable_article_content(_cc_content, url):
+                    print(f"  [Fetch] curl_cffi content incomplete after cleanup, falling back...")
+                else:
+                    print(f"  [Fetch] curl_cffi OK: {len(_cc_content)} chars, title={_cc_title[:40]}")
+                    return _core_extractors.article_success(
+                        title=_cc_title or "未知标题",
+                        author=_cc_author,
+                        content=_cc_content,
+                        source_url=url,
+                        extraction_method="curl_cffi",
+                    )
             else:
                 print(f"  [Fetch] curl_cffi got HTML but trafilatura extraction short")
         else:
@@ -3833,14 +3837,13 @@ def _fetch_article_content(url):
             print(f"  [Fetch] BeautifulSoup content too short: {len(content)} chars")
         else:
             print(f"  [Fetch] BeautifulSoup OK: {len(content)} chars, title={title[:40]}")
-            return {
-                "title": title or "未知标题",
-                "author": author,
-                "content": content,
-                "char_count": len(content),
-                "source_url": url,
-                "extraction_method": "beautifulsoup",
-            }
+            return _core_extractors.article_success(
+                title=title or "未知标题",
+                author=author,
+                content=content,
+                source_url=url,
+                extraction_method="beautifulsoup",
+            )
     except Exception as e:
         print(f"  [Fetch] BeautifulSoup failed: {e}")
 
@@ -3872,14 +3875,13 @@ def _fetch_article_content(url):
                 content = md_text.strip()
 
             print(f"  [Fetch] Jina Reader OK: {len(content)} chars")
-            return {
-                "title": title or "未知标题",
-                "author": "",
-                "content": content,
-                "char_count": len(content),
-                "source_url": url,
-                "extraction_method": "jina_reader",
-            }
+            return _core_extractors.article_success(
+                title=title or "未知标题",
+                author="",
+                content=content,
+                source_url=url,
+                extraction_method="jina_reader",
+            )
     except Exception as e:
         print(f"  [Fetch] Jina Reader failed: {e}")
 

@@ -1,9 +1,41 @@
+import re
+
+
 def is_wechat_url(url):
     return "mp.weixin.qq.com/" in (url or "") or "weixin.sogou.com/link" in (url or "")
 
 
+def strip_extractor_metadata(content):
+    """Remove extractor-generated metadata blocks from article body text."""
+    text = (content or "").strip()
+    block_re = re.compile(r"(?ms)^---\s*\n(?=.*?(?:title|author|url|hostname|description):).*?\n---\s*\n?")
+    text = block_re.sub("", text).strip()
+    embedded_block_re = re.compile(r"(?ms)---\s*\n(?=.*?(?:title|author|url|hostname|description):).*?\n---\s*\n?")
+    text = embedded_block_re.sub("", text).strip()
+    return text
+
+
+def is_usable_article_content(content, source_url="", min_chars=200):
+    """Return whether extracted content is enough to use as source material."""
+    cleaned = strip_extractor_metadata(content)
+    if len(cleaned) < min_chars:
+        return False
+
+    if is_wechat_url(source_url):
+        restricted_signals = [
+            "微信扫一扫关注该公众号",
+            "微信扫一扫可打开此内容",
+            "使用完整服务",
+        ]
+        if any(sig in cleaned for sig in restricted_signals):
+            return False
+        return len(cleaned) >= 600
+
+    return True
+
+
 def article_success(title, content, source_url, extraction_method, author=""):
-    clean_content = (content or "").strip()
+    clean_content = strip_extractor_metadata(content)
     return {
         "ok": True,
         "status": "ok",

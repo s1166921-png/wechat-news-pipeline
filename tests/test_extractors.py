@@ -3,7 +3,9 @@ import unittest
 from pipeline_core.extractors import (
     article_failure,
     article_success,
+    is_usable_article_content,
     normalize_article_result,
+    strip_extractor_metadata,
 )
 
 
@@ -47,6 +49,33 @@ class ArticleResultTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["char_count"], 2)
         self.assertEqual(result["status"], "ok")
+
+    def test_strip_extractor_metadata_removes_yaml_front_matter(self):
+        content = """---
+title: 标题
+author: 作者
+url: https://mp.weixin.qq.com/s/abc
+---
+
+这里才是正文第一段。
+
+这里是正文第二段。"""
+
+        cleaned = strip_extractor_metadata(content)
+
+        self.assertNotIn("title:", cleaned)
+        self.assertNotIn("url:", cleaned)
+        self.assertTrue(cleaned.startswith("这里才是正文第一段。"))
+
+    def test_wechat_content_short_after_cleanup_is_not_usable(self):
+        content = "✅ 1、国家统一政策\n\n微信扫一扫关注该公众号\n微信扫一扫可打开此内容，使用完整服务"
+
+        self.assertFalse(is_usable_article_content(content, "https://mp.weixin.qq.com/s/abc"))
+
+    def test_wechat_content_long_body_is_usable(self):
+        content = "很多刚开通进出口权限的外贸老板都有同一个疑惑。" * 40
+
+        self.assertTrue(is_usable_article_content(content, "https://mp.weixin.qq.com/s/abc"))
 
 
 if __name__ == "__main__":

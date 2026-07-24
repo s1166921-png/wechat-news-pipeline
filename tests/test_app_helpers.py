@@ -147,5 +147,34 @@ class FetchArticleEndpointTests(unittest.TestCase):
         self.assertIn("error_hint", data)
 
 
+class FetchArticleFunctionTests(unittest.TestCase):
+    def test_fetch_article_content_returns_standardized_result_from_trafilatura(self):
+        html = "<html><head><title>标题</title></head><body><article><p>正文</p></article></body></html>".encode("utf-8")
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return html
+
+        def fake_extract(*args, **kwargs):
+            if kwargs.get("output_format") == "json":
+                return '{"title":"标题","author":"作者"}'
+            return "---\ntitle: 标题\nurl: https://mp.weixin.qq.com/s/abc\n---\n\n" + ("正文内容" * 180)
+
+        with patch("app.urllib.request.urlopen", return_value=FakeResponse()), \
+             patch("trafilatura.extract", side_effect=fake_extract):
+            article = app._fetch_article_content("https://mp.weixin.qq.com/s/abc")
+
+        self.assertTrue(article["ok"])
+        self.assertEqual(article["status"], "ok")
+        self.assertEqual(article["extraction_method"], "trafilatura")
+        self.assertNotIn("title:", article["content"])
+
+
 if __name__ == "__main__":
     unittest.main()
