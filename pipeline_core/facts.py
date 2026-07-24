@@ -5,6 +5,7 @@ FACT_PATTERNS = [
     # Policy and formal document identifiers.
     r"\d{4}年第\d+号公告",
     r"第\d+号公告",
+    r"第[一二三四五六七八九十百千零〇两\d]+条",
     r"公告第\d+号",
     r"税总\d{4}年第\d+号公告",
     r"国税发\[\d{4}\]\d+号",
@@ -42,7 +43,16 @@ def extract_fact_tokens(text):
             if token and token not in seen:
                 seen.add(token)
                 tokens.append(token)
-    return tokens
+    return _drop_redundant_subtokens(tokens)
+
+
+def _drop_redundant_subtokens(tokens):
+    filtered = []
+    for token in tokens:
+        is_redundant = any(token != other and token in other for other in tokens)
+        if not is_redundant:
+            filtered.append(token)
+    return filtered
 
 
 def find_unsupported_fact_tokens(output_text, source_text):

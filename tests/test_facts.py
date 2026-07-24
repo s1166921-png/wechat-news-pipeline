@@ -8,14 +8,18 @@ from pipeline_core.facts import (
 
 class FactTokenTests(unittest.TestCase):
     def test_extract_fact_tokens_finds_dates_numbers_and_policy_ids(self):
-        text = "国家税务总局2026年第5号公告自2026年1月1日起施行，退税周期可能延长到3-6个月，税率13%。"
+        text = "国家税务总局2026年第5号公告第五十三条自2026年1月1日起施行，退税周期可能延长到3-6个月，税率13%。"
 
         tokens = extract_fact_tokens(text)
 
         self.assertIn("2026年第5号公告", tokens)
+        self.assertIn("第五十三条", tokens)
         self.assertIn("2026年1月1日", tokens)
         self.assertIn("3-6个月", tokens)
         self.assertIn("13%", tokens)
+        self.assertNotIn("2026年", tokens)
+        self.assertNotIn("1月", tokens)
+        self.assertNotIn("1日", tokens)
 
     def test_find_unsupported_fact_tokens_flags_hallucinated_date(self):
         source = "原文只说退税周期可能延长到3-6个月。"

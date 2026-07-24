@@ -4123,13 +4123,14 @@ def api_rewrite_article():
     if not rewritten_md:
         return jsonify({"error": "AI 改写失败，请重试"}), 500
 
-    fact_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
+    fact_warnings_initial = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
+    fact_warnings = fact_warnings_initial
     fact_guard_retry_count = 0
-    if fact_warnings:
+    if fact_warnings_initial:
         retry_prompt = f"""你刚才的改写中出现了原文没有支持的硬事实，请重新输出完整文章。
 
 必须删除或改成非具体表达的未支持事实：
-{", ".join(fact_warnings)}
+{", ".join(fact_warnings_initial)}
 
 硬性规则：
 1. 不得出现上面这些未支持事实
@@ -4151,9 +4152,9 @@ def api_rewrite_article():
         if corrected_md:
             rewritten_md = corrected_md
             fact_guard_retry_count = 1
-            remaining_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
-            if remaining_warnings:
-                print(f"  [FactGuard] unsupported facts remain after retry: {remaining_warnings[:8]}")
+            fact_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
+            if fact_warnings:
+                print(f"  [FactGuard] unsupported facts remain after retry: {fact_warnings[:8]}")
 
     # ── Convert to WeChat HTML ──
     rewritten_html = _markdown_to_wechat_html(
@@ -4179,6 +4180,7 @@ def api_rewrite_article():
         "source_quality": source_quality,
         "source_fact_tokens": source_fact_tokens,
         "fact_warnings": fact_warnings,
+        "fact_warnings_initial": fact_warnings_initial,
         "fact_guard_retry_count": fact_guard_retry_count,
         "import_mode": import_info["mode"],
         "import_recommendation": import_info["recommendation"],

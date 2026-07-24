@@ -211,9 +211,11 @@ class RewriteEndpointTests(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data["fact_guard_retry_count"], 1)
-        self.assertIn("2026年7月15日", data["fact_warnings"])
-        self.assertIn("37%", data["fact_warnings"])
+        self.assertIn("2026年7月15日", data["fact_warnings_initial"])
+        self.assertIn("37%", data["fact_warnings_initial"])
+        self.assertEqual([], data["fact_warnings"])
         self.assertNotIn("2026年7月15日", data["rewritten_markdown"])
+        self.assertNotIn("37%", data["rewritten_markdown"])
 
 
 class VerifyWechatLinksEndpointTests(unittest.TestCase):

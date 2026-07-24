@@ -1237,10 +1237,12 @@
         }
 
         var factGuardNote = "";
-        if (d.fact_guard_retry_count > 0) {
-          factGuardNote = " · 已校验并移除未支持事实";
-        } else if (d.fact_warnings && d.fact_warnings.length) {
-          factGuardNote = " · 存在需人工复核的事实";
+        var remainingFactWarnings = d.fact_warnings || [];
+        var initialFactWarnings = d.fact_warnings_initial || [];
+        if (remainingFactWarnings.length) {
+          factGuardNote = " · 存在 " + remainingFactWarnings.length + " 个事实需人工复核";
+        } else if (d.fact_guard_retry_count > 0) {
+          factGuardNote = " · 已校验并移除 " + initialFactWarnings.length + " 个未支持事实";
         }
 
         // Switch to preview

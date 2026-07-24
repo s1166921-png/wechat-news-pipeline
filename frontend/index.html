@@ -56,13 +56,13 @@
     <div class="rewrite-bar-header">
       <span class="rewrite-bar-icon">✍</span>
       <span class="rewrite-bar-title">文章改写</span>
-      <span class="rewrite-bar-hint">公众号建议直接粘贴全文；普通新闻链接可尝试自动提取</span>
+      <span class="rewrite-bar-hint">优先粘贴公众号链接；提取不足时再粘贴全文兜底</span>
       <button id="btn-toggle-rewrite" class="btn-toggle-rewrite" title="展开/收起">▼</button>
     </div>
     <div class="rewrite-bar-body" id="rewrite-bar-body">
       <div class="rewrite-paste-area" id="rewrite-paste-area">
         <textarea id="rewrite-raw-content" class="rewrite-raw-textarea"
-                  rows="5" placeholder="粘贴微信公众号文章全文。&#10;&#10;推荐流程：在微信中打开文章 → 全选复制 → 粘贴到这里 → 选择风格 → 改写文章"></textarea>
+                  rows="5" placeholder="粘贴微信公众号文章全文作为兜底。&#10;&#10;推荐流程：先粘贴文章链接 → 系统自动提取正文 → 提取不足时再从微信全选复制全文粘贴。"></textarea>
         <input type="text" id="rewrite-raw-title" class="rewrite-url-input"
                placeholder="文章标题（可选）" style="margin-top:6px">
       </div>
