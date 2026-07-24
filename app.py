@@ -16,6 +16,7 @@ from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dotenv import load_dotenv
 from pipeline_core import extractors as _core_extractors
+from pipeline_core import facts as _core_facts
 from pipeline_core import importing as _core_importing
 from pipeline_core import quality as _core_quality
 
@@ -4080,6 +4081,9 @@ def api_rewrite_article():
     if custom_angle:
         angle_instruction = f"\n\n**特别要求 — 写作角度**: {custom_angle}"
 
+    source_fact_tokens = _core_facts.extract_fact_tokens(source_content)
+    fact_token_block = "、".join(source_fact_tokens[:80]) if source_fact_tokens else "原文没有明确日期、金额、比例、政策编号等硬事实"
+
     rewrite_user_prompt = f"""请根据你的写作风格和结构公式，重写以下文章。
 
 要求：
@@ -4089,13 +4093,17 @@ def api_rewrite_article():
 4. 如果是政策/法规类内容，确保政策编号、日期、金额等精确数据不丢失
 5. 严格事实边界：不得编造原文没有的信息、日期、政策编号、金额、比例、案例、平台动作或专家判断
 6. 原文没有的信息一律不要写；如果需要衔接，只能用概括性表达，不能新增具体事实
-7. 今天是 {_today_cst_label()}
+7. 不要为了满足“数据密度”而新增数字；没有原文依据时，宁可少写数据，也不要编造数据
+8. 今天是 {_today_cst_label()}，这只是系统日期，不是新闻事实，除非原文提到，否则不得写入正文
 
 === 原文标题 ===
 {original_title}
 
 === 原文作者 ===
 {original_author or "未知"}
+
+=== 原文硬事实清单（输出中出现的日期/数字/政策编号/金额/比例必须来自这里或原文逐字可见） ===
+{fact_token_block}
 
 === 原文内容 ===
 {source_content}{angle_instruction}
@@ -4108,12 +4116,44 @@ def api_rewrite_article():
     rewritten_md = llm_chat_text(
         system=system_prompt,
         user=rewrite_user_prompt,
-        temperature=0.7,
+        temperature=0.35,
         max_tokens=4096,
     )
 
     if not rewritten_md:
         return jsonify({"error": "AI 改写失败，请重试"}), 500
+
+    fact_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
+    fact_guard_retry_count = 0
+    if fact_warnings:
+        retry_prompt = f"""你刚才的改写中出现了原文没有支持的硬事实，请重新输出完整文章。
+
+必须删除或改成非具体表达的未支持事实：
+{", ".join(fact_warnings)}
+
+硬性规则：
+1. 不得出现上面这些未支持事实
+2. 不得新增任何原文没有的日期、金额、比例、政策编号、案例或平台动作
+3. 保留原文中真实存在的事实，例如：{fact_token_block}
+4. 直接输出修正后的完整 Markdown 文章
+
+=== 原文内容 ===
+{source_content}
+
+=== 需要修正的改写稿 ===
+{rewritten_md}"""
+        corrected_md = llm_chat_text(
+            system=system_prompt,
+            user=retry_prompt,
+            temperature=0.3,
+            max_tokens=4096,
+        )
+        if corrected_md:
+            rewritten_md = corrected_md
+            fact_guard_retry_count = 1
+            remaining_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
+            if remaining_warnings:
+                print(f"  [FactGuard] unsupported facts remain after retry: {remaining_warnings[:8]}")
 
     # ── Convert to WeChat HTML ──
     rewritten_html = _markdown_to_wechat_html(
@@ -4137,6 +4177,9 @@ def api_rewrite_article():
         "source_url": source_url,
         "extraction_method": extraction_method,
         "source_quality": source_quality,
+        "source_fact_tokens": source_fact_tokens,
+        "fact_warnings": fact_warnings,
+        "fact_guard_retry_count": fact_guard_retry_count,
         "import_mode": import_info["mode"],
         "import_recommendation": import_info["recommendation"],
         "import_message": import_info["message"],

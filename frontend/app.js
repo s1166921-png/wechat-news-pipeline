@@ -1236,6 +1236,13 @@
           wechatState.cachedHtml = d.rewritten_html;
         }
 
+        var factGuardNote = "";
+        if (d.fact_guard_retry_count > 0) {
+          factGuardNote = " · 已校验并移除未支持事实";
+        } else if (d.fact_warnings && d.fact_warnings.length) {
+          factGuardNote = " · 存在需人工复核的事实";
+        }
+
         // Switch to preview
         goToStep(2);
         if (currentPreviewTab === "wechat") {
@@ -1243,7 +1250,7 @@
         }
 
         rewriteStatus.className = "rewrite-status success";
-        rewriteStatus.textContent = "✅ 改写完成！原文 " + d.original_char_count + " 字 → 改写 " + d.char_count + " 字 (" + formatImportMeta(d) + ")";
+        rewriteStatus.textContent = "✅ 改写完成！原文 " + d.original_char_count + " 字 → 改写 " + d.char_count + " 字 (" + formatImportMeta(d) + ")" + factGuardNote;
       } catch (e) {
         rewriteStatus.className = "rewrite-status error";
         rewriteStatus.textContent = "❌ 改写失败: " + e.message;

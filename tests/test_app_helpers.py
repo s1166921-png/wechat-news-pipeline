@@ -192,6 +192,29 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertIn("不得编造", captured["user"])
         self.assertIn("原文没有的信息", captured["user"])
 
+    def test_rewrite_retries_when_generated_text_has_unsupported_fact_tokens(self):
+        client = app.app.test_client()
+        calls = []
+
+        def fake_llm(**kwargs):
+            calls.append(kwargs["user"])
+            if len(calls) == 1:
+                return "# 标题\n\n2026年7月15日，企业利润下降37%。原文提到退税周期为3-6个月。"
+            return "# 标题\n\n原文提到退税周期为3-6个月，企业需要关注供应商合规。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": "原文只提到退税周期为3-6个月，企业需要关注供应商合规。" * 30,
+                "style": "b2p",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["fact_guard_retry_count"], 1)
+        self.assertIn("2026年7月15日", data["fact_warnings"])
+        self.assertIn("37%", data["fact_warnings"])
+        self.assertNotIn("2026年7月15日", data["rewritten_markdown"])
+
 
 class VerifyWechatLinksEndpointTests(unittest.TestCase):
     def test_verify_wechat_links_returns_summaries_without_content(self):
