@@ -113,12 +113,15 @@ class RewriteEndpointTests(unittest.TestCase):
         client = app.app.test_client()
 
         with patch("app._fetch_article_content", return_value={
+            "ok": True,
+            "status": "ok",
             "title": "原始标题",
             "author": "作者",
             "content": "原文内容" * 80,
             "char_count": 320,
             "source_url": "https://mp.weixin.qq.com/s/final",
             "extraction_method": "beautifulsoup",
+            "quality": {"usable": True, "needs_fallback": False, "reasons": [], "char_count": 320},
         }), patch("app.llm_chat_text", return_value="# 改写标题\n\n这是改写后的正文内容。"):
             response = client.post("/api/rewrite", json={
                 "url": "https://weixin.sogou.com/link?url=token&type=2",
@@ -129,6 +132,34 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data["extraction_method"], "beautifulsoup")
         self.assertEqual(data["source_url"], "https://mp.weixin.qq.com/s/final")
+        self.assertEqual(data["source_quality"]["usable"], True)
+
+
+class VerifyWechatLinksEndpointTests(unittest.TestCase):
+    def test_verify_wechat_links_returns_summaries_without_content(self):
+        client = app.app.test_client()
+
+        with patch("app._fetch_article_content", return_value={
+            "ok": True,
+            "status": "ok",
+            "title": "原始标题",
+            "author": "作者",
+            "content": "这段正文不应该出现在响应里",
+            "char_count": 320,
+            "source_url": "https://mp.weixin.qq.com/s/final",
+            "extraction_method": "beautifulsoup",
+            "quality": {"usable": True, "needs_fallback": False, "reasons": [], "char_count": 320},
+        }):
+            response = client.post("/api/verify-wechat-links", json={
+                "urls": ["https://mp.weixin.qq.com/s/final"],
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["usable_count"], 1)
+        self.assertNotIn("content", data["results"][0])
+        self.assertEqual(data["results"][0]["quality"]["usable"], True)
 
 
 class FetchArticleEndpointTests(unittest.TestCase):

@@ -3924,6 +3924,64 @@ def api_fetch_article():
     return jsonify(_core_extractors.normalize_article_result(article, fallback_url=url))
 
 
+def _summarize_article_check(url, article):
+    """Return a metadata-only extraction summary for diagnostics."""
+    if not article:
+        failure = _core_extractors.article_failure(url)
+        return {
+            "url": url,
+            "ok": False,
+            "status": failure["status"],
+            "method": failure["extraction_method"],
+            "title": "",
+            "chars": 0,
+            "quality": failure["quality"],
+            "manual_import_recommended": failure["manual_import_recommended"],
+        }
+
+    normalized = _core_extractors.normalize_article_result(article, fallback_url=url)
+    return {
+        "url": url,
+        "ok": normalized["ok"],
+        "status": normalized["status"],
+        "method": normalized["extraction_method"],
+        "title": normalized["title"],
+        "chars": normalized["char_count"],
+        "quality": normalized["quality"],
+        "manual_import_recommended": normalized.get("manual_import_recommended", False),
+    }
+
+
+@app.route("/api/verify-wechat-links", methods=["POST"])
+def api_verify_wechat_links():
+    """Batch-check article extraction quality without returning article bodies."""
+    data = request.get_json() or {}
+    urls = data.get("urls") or []
+    if isinstance(urls, str):
+        urls = [urls]
+    urls = [u.strip() for u in urls if isinstance(u, str) and u.strip()]
+    if not urls:
+        return jsonify({"error": "urls 必填"}), 400
+    if len(urls) > 20:
+        return jsonify({"error": "一次最多验证 20 个链接"}), 400
+
+    results = []
+    for url in urls:
+        try:
+            article = _fetch_article_content(url)
+            results.append(_summarize_article_check(url, article))
+        except Exception as e:
+            failure = _core_extractors.article_failure(url, error_hint=f"{type(e).__name__}: {e}")
+            results.append(_summarize_article_check(url, failure))
+
+    usable_count = sum(1 for r in results if r.get("ok") and (r.get("quality") or {}).get("usable"))
+    return jsonify({
+        "count": len(results),
+        "usable_count": usable_count,
+        "results": results,
+    })
+
+
 @app.route("/api/rewrite", methods=["POST"])
 def api_rewrite_article():
     """Rewrite any article in the specified B2P/B2B/B2C style.
@@ -3957,10 +4015,12 @@ def api_rewrite_article():
 
     # ── Get source content ──
     source_url = ""
+    source_quality = _core_extractors.assess_article_quality(raw_content, source_url="")
     if raw_content:
         original_title = data.get("original_title", "直接输入内容")
         original_author = ""
         source_content = raw_content
+        source_quality = _core_extractors.assess_article_quality(source_content, source_url="")
     elif url:
         article = _fetch_article_content(url)
         if not article:
@@ -3977,6 +4037,7 @@ def api_rewrite_article():
                 "manual_import_recommended": failure["manual_import_recommended"],
                 "source_url": failure["source_url"],
                 "extraction_method": failure["extraction_method"],
+                "source_quality": failure["quality"],
                 "import_mode": import_info["mode"],
                 "import_recommendation": import_info["recommendation"],
                 "import_message": import_info["message"],
@@ -3988,6 +4049,7 @@ def api_rewrite_article():
         source_content = article["content"]
         extraction_method = article.get("extraction_method", "unknown")
         source_url = article.get("source_url", url)
+        source_quality = article.get("quality") or _core_extractors.assess_article_quality(source_content, source_url=source_url)
     else:
         return jsonify({"error": "url 或 raw_content 至少填一个"}), 400
 
@@ -4063,6 +4125,7 @@ def api_rewrite_article():
         "char_count": len(rewritten_md),
         "source_url": source_url,
         "extraction_method": extraction_method,
+        "source_quality": source_quality,
         "import_mode": import_info["mode"],
         "import_recommendation": import_info["recommendation"],
         "import_message": import_info["message"],

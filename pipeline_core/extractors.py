@@ -92,6 +92,8 @@ def normalize_article_result(result, fallback_url=""):
         return article_failure(fallback_url)
     if result.get("ok") is False:
         return result
+    if result.get("ok") is True and "quality" in result:
+        return result
 
     return article_success(
         title=result.get("title") or "未知标题",
