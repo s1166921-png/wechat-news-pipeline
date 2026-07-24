@@ -1160,6 +1160,7 @@
       var url = ($("#rewrite-url").value || "").trim();
       var rawContent = ($("#rewrite-raw-content") ? $("#rewrite-raw-content").value.trim() : "");
       var rawTitle = ($("#rewrite-raw-title") ? $("#rewrite-raw-title").value.trim() : "");
+      var hasUsableRawContent = rawContent.length >= 300;
 
       if (!url && !rawContent) {
         rewriteStatus.className = "rewrite-status error";
@@ -1169,12 +1170,16 @@
 
       // Build request body
       var body = { style: rewriteStyle, theme: wechatState.theme };
-      if (rawContent) {
+      if (hasUsableRawContent) {
         body.raw_content = rawContent;
         if (rawTitle) body.original_title = rawTitle;
       } else if (url) {
         // Accept any URL — no longer restricted to WeChat only
         body.url = url;
+      } else if (rawContent) {
+        rewriteStatus.className = "rewrite-status error";
+        rewriteStatus.textContent = "粘贴内容太短，请粘贴完整文章，或输入文章链接";
+        return;
       }
 
       btnRewrite.disabled = true;

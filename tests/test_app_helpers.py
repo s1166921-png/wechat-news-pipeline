@@ -134,6 +134,64 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertEqual(data["source_url"], "https://mp.weixin.qq.com/s/final")
         self.assertEqual(data["source_quality"]["usable"], True)
 
+    def test_rewrite_prefers_url_when_raw_content_is_too_short(self):
+        client = app.app.test_client()
+
+        with patch("app._fetch_article_content", return_value={
+            "ok": True,
+            "status": "ok",
+            "title": "原始标题",
+            "author": "作者",
+            "content": "完整原文内容" * 80,
+            "char_count": 480,
+            "source_url": "https://mp.weixin.qq.com/s/final",
+            "extraction_method": "beautifulsoup",
+            "quality": {"usable": True, "needs_fallback": False, "reasons": [], "char_count": 480},
+        }) as fetch_article, patch("app.llm_chat_text", return_value="# 改写标题\n\n这是改写后的正文内容。"):
+            response = client.post("/api/rewrite", json={
+                "url": "https://mp.weixin.qq.com/s/final",
+                "raw_content": "只有四十九个字左右的残留短文本，不应该被当成完整原文。",
+                "style": "b2p",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        fetch_article.assert_called_once()
+        self.assertEqual(data["original_char_count"], len("完整原文内容" * 80))
+        self.assertEqual(data["extraction_method"], "beautifulsoup")
+
+    def test_rewrite_rejects_short_raw_content_without_url(self):
+        client = app.app.test_client()
+
+        with patch("app.llm_chat_text") as llm:
+            response = client.post("/api/rewrite", json={
+                "raw_content": "太短的原文",
+                "style": "b2p",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("原文内容太短", data["error"])
+        llm.assert_not_called()
+
+    def test_rewrite_prompt_contains_strict_fact_boundary(self):
+        client = app.app.test_client()
+        captured = {}
+
+        def fake_llm(**kwargs):
+            captured["user"] = kwargs["user"]
+            return "# 改写标题\n\n这是改写后的正文内容。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": "这是足够长的原文内容。" * 80,
+                "style": "b2p",
+            })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("不得编造", captured["user"])
+        self.assertIn("原文没有的信息", captured["user"])
+
 
 class VerifyWechatLinksEndpointTests(unittest.TestCase):
     def test_verify_wechat_links_returns_summaries_without_content(self):

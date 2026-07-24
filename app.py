@@ -37,6 +37,7 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 ARK_API_KEY = os.environ.get("ARK_API_KEY", "")
 ARK_IMAGE_MODEL = os.environ.get("ARK_IMAGE_MODEL", "doubao-seedream-4-0-250828")
 PORT = int(os.environ.get("PORT", "8888"))
+MIN_RAW_REWRITE_CHARS = 300
 
 # ── Flask App ─────────────────────────────────────────
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
@@ -4006,7 +4007,8 @@ def api_rewrite_article():
     style = (data.get("style") or "b2p").strip().lower()
     custom_angle = (data.get("custom_angle") or "").strip()
     theme = (data.get("theme") or "default").strip()
-    import_info = _classify_article_import(url, raw_content)
+    use_raw_content = bool(raw_content and len(raw_content) >= MIN_RAW_REWRITE_CHARS)
+    import_info = _classify_article_import(url if not use_raw_content else "", raw_content if use_raw_content else "")
 
     if style not in ("b2p", "b2b", "b2c"):
         return jsonify({"error": "style 必须是 b2p, b2b 或 b2c"}), 400
@@ -4016,7 +4018,14 @@ def api_rewrite_article():
     # ── Get source content ──
     source_url = ""
     source_quality = _core_extractors.assess_article_quality(raw_content, source_url="")
-    if raw_content:
+    if raw_content and not use_raw_content and not url:
+        return jsonify({
+            "error": f"原文内容太短，至少需要 {MIN_RAW_REWRITE_CHARS} 字；请粘贴完整文章或提供文章链接",
+            "status": "raw_content_too_short",
+            "source_quality": source_quality,
+        }), 400
+
+    if use_raw_content:
         original_title = data.get("original_title", "直接输入内容")
         original_author = ""
         source_content = raw_content
@@ -4078,7 +4087,9 @@ def api_rewrite_article():
 2. 完全替换写作风格、结构和语言节奏
 3. 去除原文中的营销广告、CTA、联系方式
 4. 如果是政策/法规类内容，确保政策编号、日期、金额等精确数据不丢失
-5. 今天是 {_today_cst_label()}
+5. 严格事实边界：不得编造原文没有的信息、日期、政策编号、金额、比例、案例、平台动作或专家判断
+6. 原文没有的信息一律不要写；如果需要衔接，只能用概括性表达，不能新增具体事实
+7. 今天是 {_today_cst_label()}
 
 === 原文标题 ===
 {original_title}
