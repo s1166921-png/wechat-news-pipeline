@@ -231,7 +231,11 @@ body {
   transition: all .15s;
 }
 .style-btn:hover { border-color: var(--brand-gold); }
-.style-btn.active { border-color: var(--brand-red); background: var(--brand-red-light); }
+.style-btn.active {
+  border-color: var(--brand-red); background: var(--brand-red-light);
+  color: var(--text); opacity: 1;
+  box-shadow: inset 0 0 0 1px rgba(206,14,25,.12);
+}
 .style-icon { font-size: 20px; }
 .style-name { font-weight: 600; font-size: 14px; display: block; }
 .style-hint { font-size: 12px; color: var(--text-secondary); display: block; }
@@ -575,18 +579,30 @@ body {
   font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
   outline: none; transition: border-color .2s;
 }
-.rewrite-url-input:focus { border-color: var(--accent); }
+.rewrite-url-input:focus { border-color: var(--brand-red); }
 .rewrite-style-selector { display: flex; gap: 4px; }
 .rewrite-style-btn {
   padding: 8px 14px; border: 1px solid var(--border);
   background: var(--card); border-radius: var(--radius-sm);
   cursor: pointer; font-size: 13px; transition: all .2s;
-  white-space: nowrap;
+  white-space: nowrap; color: var(--text); opacity: 1;
 }
 .rewrite-style-btn:hover { background: var(--bg); border-color: #ccc; }
 .rewrite-style-btn.active {
-  background: var(--accent); color: #fff; border-color: var(--accent);
-  font-weight: 600;
+  background: var(--brand-red); color: #fff; border-color: var(--brand-red);
+  font-weight: 600; opacity: 1;
+  box-shadow: 0 2px 8px rgba(206,14,25,.18);
+}
+.rewrite-advanced-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-secondary);
+}
+.rewrite-advanced-row label { font-weight: 600; color: var(--text); }
+.rewrite-advanced-row input[type="range"] {
+  width: 160px; accent-color: var(--brand-red);
+}
+#rewrite-temperature-val {
+  min-width: 34px; color: var(--brand-red); font-weight: 600;
 }
 .rewrite-status {
   font-size: 13px; color: var(--text-secondary); min-height: 18px;
@@ -604,5 +620,5 @@ body {
   border-radius: var(--radius-sm); font-size: 13px; resize: vertical;
   font-family: inherit; line-height: 1.6; outline: none;
 }
-.rewrite-raw-textarea:focus { border-color: var(--accent); }
+.rewrite-raw-textarea:focus { border-color: var(--brand-red); }
 .btn-sm { padding: 6px 12px; font-size: 12px; }

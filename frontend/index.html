@@ -75,7 +75,13 @@
           <button class="rewrite-style-btn" data-rewrite-style="b2c">B2C 亲测</button>
         </div>
         <button id="btn-rewrite" class="btn btn-primary">改写文章</button>
+        <button id="btn-recompose" class="btn btn-outline">重新编写</button>
         <button id="btn-show-paste" class="btn btn-outline btn-sm" title="显示或隐藏全文粘贴区">收起全文</button>
+      </div>
+      <div class="rewrite-advanced-row">
+        <label for="rewrite-temperature">重写自由度</label>
+        <input type="range" id="rewrite-temperature" min="0.45" max="0.95" step="0.05" value="0.75">
+        <span id="rewrite-temperature-val">0.75</span>
       </div>
       <div id="rewrite-status" class="rewrite-status"></div>
     </div>

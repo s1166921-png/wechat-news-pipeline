@@ -4090,11 +4090,21 @@ def api_rewrite_article():
     style = (data.get("style") or "b2p").strip().lower()
     custom_angle = (data.get("custom_angle") or "").strip()
     theme = (data.get("theme") or "default").strip()
+    rewrite_mode = (data.get("rewrite_mode") or "rewrite").strip().lower()
     use_raw_content = bool(raw_content and len(raw_content) >= MIN_RAW_REWRITE_CHARS)
     import_info = _classify_article_import(url if not use_raw_content else "", raw_content if use_raw_content else "")
 
     if style not in ("b2p", "b2b", "b2c"):
         return jsonify({"error": "style 必须是 b2p, b2b 或 b2c"}), 400
+    if rewrite_mode not in ("rewrite", "recompose"):
+        return jsonify({"error": "rewrite_mode 必须是 rewrite 或 recompose"}), 400
+
+    default_temperature = 0.75 if rewrite_mode == "recompose" else 0.35
+    try:
+        rewrite_temperature = float(data.get("temperature", default_temperature))
+    except (TypeError, ValueError):
+        rewrite_temperature = default_temperature
+    rewrite_temperature = max(0.2, min(0.95, rewrite_temperature))
 
     extraction_method = "raw_input"
 
@@ -4165,6 +4175,16 @@ def api_rewrite_article():
 
     source_fact_tokens = _core_facts.extract_fact_tokens(source_content)
     fact_token_block = "、".join(source_fact_tokens[:80]) if source_fact_tokens else "原文没有明确日期、金额、比例、政策编号等硬事实"
+    rewrite_mode_instruction = ""
+    if rewrite_mode == "recompose":
+        rewrite_mode_instruction = """
+
+=== 重新编写要求 ===
+这次不是逐句改写，而是重新编写。请先理解原文事实，再重新组织文章：
+1. 不得逐句改写，不要沿用原文段落顺序、标题层级和句式节奏
+2. 可以重排信息顺序、重写开头、合并重复段落、改写小标题
+3. 事实、日期、金额、比例、政策编号必须仍然只来自原文和硬事实清单
+4. 表达要像重新采写的一篇新稿，但不能新增原文没有的结论、案例或数据"""
 
     rewrite_user_prompt = f"""请根据你的写作风格和结构公式，重写以下文章。
 
@@ -4186,6 +4206,7 @@ def api_rewrite_article():
 
 === 原文硬事实清单（输出中出现的日期/数字/政策编号/金额/比例必须来自这里或原文逐字可见） ===
 {fact_token_block}
+{rewrite_mode_instruction}
 
 === 原文内容 ===
 {source_content}{angle_instruction}
@@ -4198,7 +4219,7 @@ def api_rewrite_article():
     rewritten_md = llm_chat_text(
         system=system_prompt,
         user=rewrite_user_prompt,
-        temperature=0.35,
+        temperature=rewrite_temperature,
         max_tokens=4096,
     )
 
@@ -4255,6 +4276,8 @@ def api_rewrite_article():
         "style": style,
         "style_label": style_label,
         "theme": theme,
+        "rewrite_mode": rewrite_mode,
+        "rewrite_temperature": rewrite_temperature,
         "wechat_compatible": True,
         "char_count": len(rewritten_md),
         "source_url": source_url,

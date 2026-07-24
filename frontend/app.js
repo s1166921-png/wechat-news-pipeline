@@ -1154,113 +1154,136 @@
 
   // Rewrite button
   var btnRewrite = $("#btn-rewrite");
+  var btnRecompose = $("#btn-recompose");
+  var rewriteTemperature = $("#rewrite-temperature");
+  var rewriteTemperatureVal = $("#rewrite-temperature-val");
   var rewriteStatus = $("#rewrite-status");
-  if (btnRewrite) {
-    btnRewrite.addEventListener("click", async function () {
-      var url = ($("#rewrite-url").value || "").trim();
-      var rawContent = ($("#rewrite-raw-content") ? $("#rewrite-raw-content").value.trim() : "");
-      var rawTitle = ($("#rewrite-raw-title") ? $("#rewrite-raw-title").value.trim() : "");
-      var hasUsableRawContent = rawContent.length >= 300;
-
-      if (!url && !rawContent) {
-        rewriteStatus.className = "rewrite-status error";
-        rewriteStatus.textContent = "请粘贴公众号全文，或输入可访问的文章链接";
-        return;
-      }
-
-      // Build request body
-      var body = { style: rewriteStyle, theme: wechatState.theme };
-      if (hasUsableRawContent) {
-        body.raw_content = rawContent;
-        if (rawTitle) body.original_title = rawTitle;
-      } else if (url) {
-        // Accept any URL — no longer restricted to WeChat only
-        body.url = url;
-      } else if (rawContent) {
-        rewriteStatus.className = "rewrite-status error";
-        rewriteStatus.textContent = "粘贴内容太短，请粘贴完整文章，或输入文章链接";
-        return;
-      }
-
-      btnRewrite.disabled = true;
-      rewriteStatus.className = "rewrite-status loading";
-      rewriteStatus.innerHTML = rawContent
-        ? '<span class="spinner"></span> 正在基于粘贴全文改写...'
-        : '<span class="spinner"></span> 正在尝试从链接提取正文...';
-
-      try {
-        var r = await fetch("/api/rewrite", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        var d = await r.json();
-        if (d.error) {
-          rewriteStatus.className = "rewrite-status error";
-          rewriteStatus.textContent = d.error_hint || d.hint || d.error;
-          // If URL fetch failed, auto-expand paste area and prompt
-          if (!rawContent && (d.manual_import_recommended || d.error.includes("无法提取") || d.error.includes("反爬"))) {
-            var pasteArea = $("#rewrite-paste-area");
-            if (pasteArea && pasteArea.style.display === "none") {
-              pasteArea.style.display = "flex";
-              var showPasteBtn = $("#btn-show-paste");
-              if (showPasteBtn) showPasteBtn.textContent = "收起全文";
-            }
-            var rawTextarea = $("#rewrite-raw-content");
-            if (rawTextarea) {
-              rawTextarea.placeholder = "请在这里粘贴文章全文（在浏览器中打开文章 → 全选复制 → 粘贴到这里）";
-              rawTextarea.focus();
-            }
-            rewriteStatus.innerHTML = (d.error_hint || d.hint || "服务器无法直接访问该文章。") + "<br>请在上方粘贴全文后再次点击「改写文章」。";
-          }
-          return;
-        }
-
-        // Copy result to state (like generateArticle does)
-        state.articleContent = d.rewritten_markdown;
-        state.selectedNews = {
-          title: d.original_title,
-          suggested_topic: d.original_title,
-          url: url || "",
-          source: d.original_author || "微信公众号",
-        };
-
-        // Render markdown preview
-        dom.articlePreview.innerHTML = marked.parse(d.rewritten_markdown);
-        dom.articleCharCount.textContent = d.char_count + " 字 (改写自: " + d.original_char_count + " 字原文)";
-        dom.previewActions.style.display = "flex";
-        dom.generateStatus.innerHTML = "✅ 改写完成 · " + d.style_label + " · " + d.char_count + " 字 · " + formatImportMeta(d);
-
-        // Also cache WeChat HTML for preview
-        if (d.rewritten_html) {
-          wechatState.cachedHtml = d.rewritten_html;
-        }
-
-        var factGuardNote = "";
-        var remainingFactWarnings = d.fact_warnings || [];
-        var initialFactWarnings = d.fact_warnings_initial || [];
-        if (remainingFactWarnings.length) {
-          factGuardNote = " · 存在 " + remainingFactWarnings.length + " 个事实需人工复核";
-        } else if (d.fact_guard_retry_count > 0) {
-          factGuardNote = " · 已校验并移除 " + initialFactWarnings.length + " 个未支持事实";
-        }
-
-        // Switch to preview
-        goToStep(2);
-        if (currentPreviewTab === "wechat") {
-          renderWechatPreview();
-        }
-
-        rewriteStatus.className = "rewrite-status success";
-        rewriteStatus.textContent = "✅ 改写完成！原文 " + d.original_char_count + " 字 → 改写 " + d.char_count + " 字 (" + formatImportMeta(d) + ")" + factGuardNote;
-      } catch (e) {
-        rewriteStatus.className = "rewrite-status error";
-        rewriteStatus.textContent = "❌ 改写失败: " + e.message;
-        toast("改写失败: " + e.message, "error");
-      } finally {
-        btnRewrite.disabled = false;
-      }
+  if (rewriteTemperature && rewriteTemperatureVal) {
+    rewriteTemperature.addEventListener("input", function () {
+      rewriteTemperatureVal.textContent = Number(rewriteTemperature.value).toFixed(2);
     });
+  }
+
+  async function runRewrite(rewriteMode) {
+    var url = ($("#rewrite-url").value || "").trim();
+    var rawContent = ($("#rewrite-raw-content") ? $("#rewrite-raw-content").value.trim() : "");
+    var rawTitle = ($("#rewrite-raw-title") ? $("#rewrite-raw-title").value.trim() : "");
+    var hasUsableRawContent = rawContent.length >= 300;
+    var isRecompose = rewriteMode === "recompose";
+
+    if (!url && !rawContent) {
+      rewriteStatus.className = "rewrite-status error";
+      rewriteStatus.textContent = "请粘贴公众号全文，或输入可访问的文章链接";
+      return;
+    }
+
+    // Build request body
+    var body = {
+      style: rewriteStyle,
+      theme: wechatState.theme,
+      rewrite_mode: isRecompose ? "recompose" : "rewrite",
+      temperature: isRecompose && rewriteTemperature ? Number(rewriteTemperature.value) : 0.35,
+    };
+    if (hasUsableRawContent) {
+      body.raw_content = rawContent;
+      if (rawTitle) body.original_title = rawTitle;
+    } else if (url) {
+      // Accept any URL — no longer restricted to WeChat only
+      body.url = url;
+    } else if (rawContent) {
+      rewriteStatus.className = "rewrite-status error";
+      rewriteStatus.textContent = "粘贴内容太短，请粘贴完整文章，或输入文章链接";
+      return;
+    }
+
+    btnRewrite.disabled = true;
+    if (btnRecompose) btnRecompose.disabled = true;
+    rewriteStatus.className = "rewrite-status loading";
+    rewriteStatus.innerHTML = rawContent
+      ? '<span class="spinner"></span> 正在基于粘贴全文' + (isRecompose ? "重新编写..." : "改写...")
+      : '<span class="spinner"></span> 正在尝试从链接提取正文...';
+
+    try {
+      var r = await fetch("/api/rewrite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      var d = await r.json();
+      if (d.error) {
+        rewriteStatus.className = "rewrite-status error";
+        rewriteStatus.textContent = d.error_hint || d.hint || d.error;
+        // If URL fetch failed, auto-expand paste area and prompt
+        if (!rawContent && (d.manual_import_recommended || d.error.includes("无法提取") || d.error.includes("反爬"))) {
+          var pasteArea = $("#rewrite-paste-area");
+          if (pasteArea && pasteArea.style.display === "none") {
+            pasteArea.style.display = "flex";
+            var showPasteBtn = $("#btn-show-paste");
+            if (showPasteBtn) showPasteBtn.textContent = "收起全文";
+          }
+          var rawTextarea = $("#rewrite-raw-content");
+          if (rawTextarea) {
+            rawTextarea.placeholder = "请在这里粘贴文章全文（在浏览器中打开文章 → 全选复制 → 粘贴到这里）";
+            rawTextarea.focus();
+          }
+          rewriteStatus.innerHTML = (d.error_hint || d.hint || "服务器无法直接访问该文章。") + "<br>请在上方粘贴全文后再次点击「改写文章」。";
+        }
+        return;
+      }
+
+      // Copy result to state (like generateArticle does)
+      state.articleContent = d.rewritten_markdown;
+      state.selectedNews = {
+        title: d.original_title,
+        suggested_topic: d.original_title,
+        url: url || "",
+        source: d.original_author || "微信公众号",
+      };
+
+      // Render markdown preview
+      dom.articlePreview.innerHTML = marked.parse(d.rewritten_markdown);
+      dom.articleCharCount.textContent = d.char_count + " 字 (改写自: " + d.original_char_count + " 字原文)";
+      dom.previewActions.style.display = "flex";
+      dom.generateStatus.innerHTML = "✅ " + (d.rewrite_mode === "recompose" ? "重新编写完成" : "改写完成") + " · " + d.style_label + " · " + d.char_count + " 字 · " + formatImportMeta(d);
+
+      // Also cache WeChat HTML for preview
+      if (d.rewritten_html) {
+        wechatState.cachedHtml = d.rewritten_html;
+      }
+
+      var factGuardNote = "";
+      var remainingFactWarnings = d.fact_warnings || [];
+      var initialFactWarnings = d.fact_warnings_initial || [];
+      if (remainingFactWarnings.length) {
+        factGuardNote = " · 存在 " + remainingFactWarnings.length + " 个事实需人工复核";
+      } else if (d.fact_guard_retry_count > 0) {
+        factGuardNote = " · 已校验并移除 " + initialFactWarnings.length + " 个未支持事实";
+      }
+
+      // Switch to preview
+      goToStep(2);
+      if (currentPreviewTab === "wechat") {
+        renderWechatPreview();
+      }
+
+      var rewriteTemperatureNote = d.rewrite_mode === "recompose" ? " · 自由度 " + Number(d.rewrite_temperature || 0).toFixed(2) : "";
+      rewriteStatus.className = "rewrite-status success";
+      rewriteStatus.textContent = "✅ " + (d.rewrite_mode === "recompose" ? "重新编写完成" : "改写完成") + "！原文 " + d.original_char_count + " 字 → 成文 " + d.char_count + " 字 (" + formatImportMeta(d) + ")" + rewriteTemperatureNote + factGuardNote;
+    } catch (e) {
+      rewriteStatus.className = "rewrite-status error";
+      rewriteStatus.textContent = "❌ 改写失败: " + e.message;
+      toast("改写失败: " + e.message, "error");
+    } finally {
+      btnRewrite.disabled = false;
+      if (btnRecompose) btnRecompose.disabled = false;
+    }
+  }
+
+  if (btnRewrite) {
+    btnRewrite.addEventListener("click", function () { runRewrite("rewrite"); });
+  }
+  if (btnRecompose) {
+    btnRecompose.addEventListener("click", function () { runRewrite("recompose"); });
   }
 
   // ── Init ──────────────────────────────────────────

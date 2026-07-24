@@ -220,6 +220,49 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertNotIn("2026年7月15日", data["rewritten_markdown"])
         self.assertNotIn("37%", data["rewritten_markdown"])
 
+    def test_rewrite_recompose_mode_uses_higher_temperature_and_restructure_prompt(self):
+        client = app.app.test_client()
+        captured = {}
+
+        def fake_llm(**kwargs):
+            captured.update(kwargs)
+            return "# 新标题\n\n这是重新编写后的正文。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": "原文提到退税周期为3-6个月，企业需要关注供应商合规。" * 30,
+                "style": "b2b",
+                "rewrite_mode": "recompose",
+                "temperature": 0.82,
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured["temperature"], 0.82)
+        self.assertEqual(data["rewrite_mode"], "recompose")
+        self.assertEqual(data["rewrite_temperature"], 0.82)
+        self.assertIn("重新编写", captured["user"])
+        self.assertIn("不要沿用原文段落顺序", captured["user"])
+        self.assertIn("不得逐句改写", captured["user"])
+
+
+class FrontendRewriteUiTests(unittest.TestCase):
+    def test_rewrite_bar_has_recompose_button_and_temperature_control(self):
+        html = (app.FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+        js = (app.FRONTEND_DIR / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="btn-recompose"', html)
+        self.assertIn('id="rewrite-temperature"', html)
+        self.assertIn("rewrite_mode", js)
+        self.assertIn("rewrite_temperature", js)
+
+    def test_rewrite_style_active_button_remains_visible(self):
+        css = (app.FRONTEND_DIR / "style.css").read_text(encoding="utf-8")
+
+        self.assertIn(".rewrite-style-btn.active", css)
+        self.assertIn("opacity: 1", css)
+        self.assertIn("box-shadow", css)
+
 
 class VerifyWechatLinksEndpointTests(unittest.TestCase):
     def test_verify_wechat_links_returns_summaries_without_content(self):
