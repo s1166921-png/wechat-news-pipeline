@@ -5,6 +5,7 @@ from pipeline_core.extractors import (
     article_success,
     is_usable_article_content,
     normalize_article_result,
+    assess_article_quality,
     strip_extractor_metadata,
 )
 
@@ -76,6 +77,26 @@ url: https://mp.weixin.qq.com/s/abc
         content = "很多刚开通进出口权限的外贸老板都有同一个疑惑。" * 40
 
         self.assertTrue(is_usable_article_content(content, "https://mp.weixin.qq.com/s/abc"))
+
+    def test_assess_article_quality_reports_wechat_restricted_tail(self):
+        content = "正文" * 120 + "\n微信扫一扫可打开此内容，使用完整服务"
+
+        quality = assess_article_quality(content, "https://mp.weixin.qq.com/s/abc")
+
+        self.assertFalse(quality["usable"])
+        self.assertTrue(quality["needs_fallback"])
+        self.assertIn("wechat_restricted_tail", quality["reasons"])
+
+    def test_article_success_includes_quality_report(self):
+        result = article_success(
+            title="标题",
+            content="很多刚开通进出口权限的外贸老板都有同一个疑惑。" * 40,
+            source_url="https://mp.weixin.qq.com/s/abc",
+            extraction_method="beautifulsoup",
+        )
+
+        self.assertIn("quality", result)
+        self.assertTrue(result["quality"]["usable"])
 
 
 if __name__ == "__main__":
