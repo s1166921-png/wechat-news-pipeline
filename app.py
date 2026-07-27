@@ -2378,6 +2378,42 @@ def _build_image_prompt(article_text, image_type="cover"):
     return result.strip() if result else f"跨境电商商业插图，现代简约风格，{'红金配色' if image_type == 'cover' else '数据可视化'}"
 
 
+def _fallback_body_image_prompt(section_text, index=0):
+    """Return a conservative prompt when the image API rejects a detailed prompt."""
+    themes = [
+        "企业合规流程信息图，文件、审核节点、风险提示，红白灰商务风格，无人物无品牌",
+        "跨境业务风险管理插画，合同发票物流单证与检查清单，简洁商务信息图",
+        "资金周转与流程审核示意图，数据看板、时间轴、提示标签，现代企业风格",
+        "运营决策清单插画，团队看板、合规资料、流程箭头，干净白底商业风格",
+    ]
+    base = themes[index % len(themes)]
+    keywords = re.sub(r"[#>*`|_\-\[\]()（）【】《》:：，。！？、\s]+", " ", section_text or "").strip()
+    keywords = keywords[:48]
+    return f"{base}，主题关键词：{keywords}" if keywords else base
+
+
+def _generate_body_image_with_retry(prompt, section_text, index=0):
+    """Generate a body image and retry once with a safer prompt if needed."""
+    urls = _generate_ark_image(prompt, size="body", n=1)
+    if urls:
+        return urls, prompt, False
+    retry_prompt = _fallback_body_image_prompt(section_text, index)
+    print(f"  [Image {index + 1}] Retrying with safe prompt: {retry_prompt[:80]}...")
+    retry_urls = _generate_ark_image(retry_prompt, size="body", n=1)
+    return retry_urls, retry_prompt, True
+
+
+def _coerce_custom_prompt_entry(entry):
+    """Normalize custom prompt entries from old strings or new objects."""
+    if isinstance(entry, dict):
+        return {
+            "prompt": str(entry.get("prompt") or entry.get("text") or "").strip(),
+            "section_excerpt": str(entry.get("section_excerpt") or "").strip(),
+            "index": entry.get("index"),
+        }
+    return {"prompt": str(entry or "").strip(), "section_excerpt": "", "index": None}
+
+
 def _download_image(img_url, save_path):
     """下载图片到本地。"""
     import requests as _req
@@ -3254,12 +3290,14 @@ def api_generate_image():
     # If custom prompts provided, use them directly
     if custom_prompts and isinstance(custom_prompts, list) and len(custom_prompts) > 0:
         results = []
-        for i, cp in enumerate(custom_prompts[:count]):
-            cp = (cp or "").strip()
+        for i, entry in enumerate(custom_prompts[:count]):
+            normalized = _coerce_custom_prompt_entry(entry)
+            cp = normalized["prompt"]
             if not cp:
                 continue
             print(f"  [Image {i+1}] Custom prompt: {cp[:80]}...")
-            urls = _generate_ark_image(cp, size="body", n=1)
+            section_excerpt = normalized["section_excerpt"] or cp[:100]
+            urls, final_prompt, retried = _generate_body_image_with_retry(cp, section_excerpt, i)
             saved = []
             local_urls = []
             for j, url in enumerate(urls):
@@ -3269,11 +3307,14 @@ def api_generate_image():
                     saved.append(str(save_path))
                     local_urls.append(_public_output_image_url(save_path))
             results.append({
-                "index": i, "prompt": cp, "image_urls": local_urls or urls,
+                "index": normalized["index"] if normalized["index"] is not None else i,
+                "prompt": final_prompt, "original_prompt": cp,
+                "image_urls": local_urls or urls,
                 "external_image_urls": urls, "local_image_urls": local_urls,
-                "saved_paths": saved, "section_excerpt": cp[:100],
+                "saved_paths": saved, "section_excerpt": section_excerpt,
                 "status": "ok" if urls else "failed",
-                "error": "" if urls else "图片生成接口未返回图片，请调整 Prompt 后重试",
+                "retry_used": retried,
+                "error": "" if urls else "图片生成接口未返回图片，已自动换用安全 Prompt 重试但仍失败，请调整 Prompt 后重试",
             })
         return jsonify({"images": results, "total": len(results)})
 
@@ -3285,7 +3326,7 @@ def api_generate_image():
         prompt = _build_image_prompt(section[:200], "body")
         print(f"  [Image {i+1}] Prompt: {prompt[:80]}...")
 
-        urls = _generate_ark_image(prompt, size="body", n=1)
+        urls, final_prompt, retried = _generate_body_image_with_retry(prompt, section, i)
 
         saved = []
         local_urls = []
@@ -3297,11 +3338,13 @@ def api_generate_image():
                 local_urls.append(_public_output_image_url(save_path))
 
         results.append({
-            "index": i, "prompt": prompt, "image_urls": local_urls or urls,
+            "index": i, "prompt": final_prompt, "original_prompt": prompt,
+            "image_urls": local_urls or urls,
             "external_image_urls": urls, "local_image_urls": local_urls,
             "saved_paths": saved, "section_excerpt": section[:100],
             "status": "ok" if urls else "failed",
-            "error": "" if urls else "图片生成接口未返回图片，请编辑 Prompt 后重试",
+            "retry_used": retried,
+            "error": "" if urls else "图片生成接口未返回图片，已自动换用安全 Prompt 重试但仍失败，请编辑 Prompt 后重试",
         })
 
     return jsonify({"images": results, "total": len(results)})

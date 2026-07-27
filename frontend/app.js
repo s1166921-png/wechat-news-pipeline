@@ -508,6 +508,7 @@
     // Convert imageSlots array to the image map format the backend expects.
     // Each body image includes section_excerpt so the backend can place
     // images next to their related paragraphs instead of arbitrary positions.
+    syncImageSlots();
     var map = {};
     imageSlots.forEach(function(slot, position) {
       if (slot.type === 'cover') {
@@ -855,7 +856,7 @@
       renderBodyImages(d.images || []);
       renderBodyPromptEditors(d.images || []);
       var failedCount = (d.images || []).filter(function (img) { return img && img.status === "failed"; }).length;
-      toast(d.total + " 张配图返回完成" + (failedCount ? "，其中 " + failedCount + " 张需重试" : ""), failedCount ? "info" : "success");
+      toast(d.total + " 张配图返回完成，已按对应段落自动插入" + (failedCount ? "，其中 " + failedCount + " 张需重试" : ""), failedCount ? "info" : "success");
       refreshVisibleWechatPreviews();
     } catch (e) {
       var errMsg = e.name === "AbortError" ? "请求超时（>180s），请重试" : e.message;
@@ -908,7 +909,14 @@
           var r = await fetch("/api/generate-image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ custom_prompts: [currentPrompt], count: 1 }),
+            body: JSON.stringify({
+              custom_prompts: [{
+                prompt: currentPrompt,
+                section_excerpt: imgData.section_excerpt || "",
+                index: idx,
+              }],
+              count: 1,
+            }),
           });
           var d = await r.json();
           if (d.images && d.images.length && d.images[0].image_urls && d.images[0].image_urls.length) {
@@ -982,7 +990,14 @@
           var r = await fetch("/api/generate-image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ custom_prompts: [newPrompt], count: 1 }),
+            body: JSON.stringify({
+              custom_prompts: [{
+                prompt: newPrompt,
+                section_excerpt: (state.generatedImages.body[idx] && state.generatedImages.body[idx].section_excerpt) || "",
+                index: idx,
+              }],
+              count: 1,
+            }),
           });
           var d = await r.json();
           if (d.images && d.images.length && d.images[0].image_urls && d.images[0].image_urls.length) {

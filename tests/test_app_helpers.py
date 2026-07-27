@@ -128,7 +128,7 @@ class ImageGenerationTests(unittest.TestCase):
 
         def fake_image(prompt, size="body", n=1):
             calls.append(prompt)
-            if len(calls) == 2:
+            if len(calls) in (2, 3):
                 return []
             return ["https://example.com/image-%d.png" % len(calls)]
 
@@ -148,6 +148,50 @@ class ImageGenerationTests(unittest.TestCase):
         self.assertIn("未返回图片", data["images"][1]["error"])
         self.assertEqual(data["images"][0]["status"], "ok")
         self.assertEqual(data["images"][2]["status"], "ok")
+
+    def test_generate_image_retries_failed_slot_with_safe_prompt(self):
+        client = app.app.test_client()
+        calls = []
+
+        def fake_image(prompt, size="body", n=1):
+            calls.append(prompt)
+            if len(calls) == 1:
+                return []
+            return ["https://example.com/safe.png"]
+
+        with patch("app._generate_ark_image", side_effect=fake_image), \
+             patch("app._download_image", return_value=False):
+            response = client.post("/api/generate-image", json={
+                "custom_prompts": [{
+                    "prompt": "可能触发审核的详细 Prompt",
+                    "section_excerpt": "这是第一段正文对应内容",
+                    "index": 0,
+                }],
+                "count": 1,
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["images"][0]["status"], "ok")
+        self.assertEqual(data["images"][0]["retry_used"], True)
+        self.assertEqual(data["images"][0]["section_excerpt"], "这是第一段正文对应内容")
+        self.assertEqual(data["images"][0]["index"], 0)
+        self.assertIn("企业合规流程信息图", data["images"][0]["prompt"])
+
+    def test_custom_prompt_string_remains_backward_compatible(self):
+        client = app.app.test_client()
+
+        with patch("app._generate_ark_image", return_value=["https://example.com/custom.png"]), \
+             patch("app._download_image", return_value=False):
+            response = client.post("/api/generate-image", json={
+                "custom_prompts": ["自定义配图 Prompt"],
+                "count": 1,
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["images"][0]["status"], "ok")
+        self.assertEqual(data["images"][0]["section_excerpt"], "自定义配图 Prompt")
 
 
 class RewriteEndpointTests(unittest.TestCase):
