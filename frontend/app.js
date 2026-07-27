@@ -58,6 +58,9 @@
     btnExportHtml: $("#btn-export-html"),
     btnExportTxt: $("#btn-export-txt"),
     exportStatus: $("#export-status"),
+    exportWechatTitle: $("#export-wechat-title"),
+    exportWechatDate: $("#export-wechat-date"),
+    exportWechatBody: $("#export-wechat-body"),
     btnAutoPipeline: $("#btn-auto-pipeline"),
     pipelineProgress: $("#pipeline-progress"),
     statusMessage: $("#status-message"),
@@ -354,13 +357,26 @@
     cachedHtml: "",
   };
 
-  async function renderWechatPreview() {
-    if (!state.articleContent) { console.log("[renderWechatPreview] Skipped: no articleContent"); return; }
-    console.log("[renderWechatPreview] Called, content length:", state.articleContent.length);
-    var title = (state.selectedNews && (state.selectedNews.suggested_topic || state.selectedNews.title)) || "跨境电商资讯";
-    $("#wechat-title").textContent = title;
+  function getArticleTitle() {
+    return (state.selectedNews && (state.selectedNews.suggested_topic || state.selectedNews.title)) || "跨境电商资讯";
+  }
+
+  function updatePreviewHeader(titleEl, dateEl) {
+    var title = getArticleTitle();
+    if (titleEl) titleEl.textContent = title;
     var now = new Date();
-    $("#wechat-date").textContent = now.getFullYear() + "年" + (now.getMonth() + 1) + "月" + now.getDate() + "日";
+    if (dateEl) dateEl.textContent = now.getFullYear() + "年" + (now.getMonth() + 1) + "月" + now.getDate() + "日";
+    return title;
+  }
+
+  async function renderWechatArticlePreview(bodyEl, titleEl, dateEl, options) {
+    options = options || {};
+    if (!state.articleContent) {
+      if (bodyEl) bodyEl.innerHTML = '<p class="text-muted">生成文章和配图后，在这里预览最终微信图文效果。</p>';
+      return;
+    }
+    console.log("[renderWechatPreview] Called, content length:", state.articleContent.length);
+    var title = updatePreviewHeader(titleEl, dateEl);
 
     // Use buildImageMap() which respects user's position edits
     var imageMap = buildImageMap();
@@ -386,17 +402,39 @@
         wechatState.cachedHtml = d.html;
         var bodyMatch = d.html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
         var bodyHtml = bodyMatch ? bodyMatch[1] : d.html;
-        $("#wechat-body").innerHTML = bodyHtml;
-      } else {
-        $("#wechat-body").innerHTML = marked.parse(state.articleContent);
+        if (bodyEl) bodyEl.innerHTML = bodyHtml;
+      } else if (bodyEl) {
+        bodyEl.innerHTML = marked.parse(state.articleContent);
       }
     } catch (e) {
       console.error("[renderWechatPreview] Failed:", e);
-      $("#wechat-body").innerHTML = marked.parse(state.articleContent);
+      if (bodyEl) bodyEl.innerHTML = marked.parse(state.articleContent);
     }
 
-    // Refresh image position editor
-    renderImagePositionEditor();
+    if (options.refreshPositions !== false) {
+      renderImagePositionEditor(options.positionTarget || "step2");
+    }
+  }
+
+  async function renderWechatPreview() {
+    await renderWechatArticlePreview($("#wechat-body"), $("#wechat-title"), $("#wechat-date"), {
+      positionTarget: "step2",
+    });
+  }
+
+  async function renderExportWechatPreview() {
+    await renderWechatArticlePreview(dom.exportWechatBody, dom.exportWechatTitle, dom.exportWechatDate, {
+      positionTarget: "export",
+    });
+  }
+
+  function refreshVisibleWechatPreviews() {
+    if (currentPreviewTab === "wechat") {
+      renderWechatPreview();
+    }
+    if (state.currentStep === 3) {
+      renderExportWechatPreview();
+    }
   }
 
   // ── Image Position Editor ───────────────────────
@@ -484,15 +522,16 @@
     return Object.keys(map).length > 0 ? map : undefined;
   }
 
-  function renderImagePositionEditor() {
+  function renderImagePositionEditor(target) {
+    target = target || "step2";
     syncImageSlots();
-    var editor = $("#image-position-editor");
-    var list = $("#image-position-list");
+    var editor = target === "export" ? $("#export-image-position-editor") : $("#image-position-editor");
+    var list = target === "export" ? $("#export-image-position-list") : $("#image-position-list");
     if (!editor || !list) return;
 
     if (imageSlots.length === 0) {
       editor.style.display = 'block';
-      list.innerHTML = '<div class="no-images-hint">📸 文章暂无配图，切换到 <strong>Step 3 配图导出</strong> 生成封面和正文图片</div>';
+      list.innerHTML = '<div class="no-images-hint">📸 文章暂无配图，请先在 Step 3 生成封面或正文图片。</div>';
       return;
     }
 
@@ -523,8 +562,8 @@
           var tmp = imageSlots[pos];
           imageSlots[pos] = imageSlots[pos - 1];
           imageSlots[pos - 1] = tmp;
-          renderImagePositionEditor();
-          renderWechatPreview();
+          renderImagePositionEditor(target);
+          refreshVisibleWechatPreviews();
         }
       });
     });
@@ -535,8 +574,8 @@
           var tmp = imageSlots[pos];
           imageSlots[pos] = imageSlots[pos + 1];
           imageSlots[pos + 1] = tmp;
-          renderImagePositionEditor();
-          renderWechatPreview();
+          renderImagePositionEditor(target);
+          refreshVisibleWechatPreviews();
         }
       });
     });
@@ -544,8 +583,8 @@
       btn.addEventListener('click', function() {
         var pos = parseInt(btn.dataset.pos);
         imageSlots.splice(pos, 1);
-        renderImagePositionEditor();
-        renderWechatPreview();
+        renderImagePositionEditor(target);
+        refreshVisibleWechatPreviews();
       });
     });
   }
@@ -561,7 +600,7 @@
     if (themeSelect) {
       themeSelect.addEventListener("change", function () {
         wechatState.theme = this.value;
-        renderWechatPreview();
+        refreshVisibleWechatPreviews();
       });
     }
     if (fontSizeSlider) {
@@ -572,13 +611,13 @@
         // Debounced live preview while dragging slider
         clearTimeout(wechatState._fontDebounce);
         wechatState._fontDebounce = setTimeout(function () {
-          renderWechatPreview();
+          refreshVisibleWechatPreviews();
         }, 300);
       });
       fontSizeSlider.addEventListener("change", function () {
         clearTimeout(wechatState._fontDebounce);
         console.log("[Toolbar] fontSize change final:", wechatState.fontSize);
-        renderWechatPreview();
+        refreshVisibleWechatPreviews();
       });
     }
     if (accentColorInput) {
@@ -588,13 +627,13 @@
         // Debounced live preview while dragging color picker
         clearTimeout(wechatState._colorDebounce);
         wechatState._colorDebounce = setTimeout(function () {
-          renderWechatPreview();
+          refreshVisibleWechatPreviews();
         }, 300);
       });
       accentColorInput.addEventListener("change", function () {
         clearTimeout(wechatState._colorDebounce);
         console.log("[Toolbar] accentColor change final:", wechatState.accentColor);
-        renderWechatPreview();
+        refreshVisibleWechatPreviews();
       });
     }
     if (btnCopy) {
@@ -667,10 +706,7 @@
       dom.articleCharCount.textContent = d.char_count + " 字";
       dom.previewActions.style.display = "flex";
       dom.generateStatus.innerHTML = "✅ 生成完成 · " + d.char_count + " 字 · 已保存到 " + d.filename;
-      // Refresh WeChat preview if visible
-      if (currentPreviewTab === "wechat") {
-        renderWechatPreview();
-      }
+      refreshVisibleWechatPreviews();
     } catch (e) {
       toast("生成失败: " + e.message, "error");
       dom.generateStatus.textContent = "❌ 生成失败";
@@ -681,7 +717,10 @@
 
   // ── Step 3: Image Generation ─────────────────────
   function updateStep3UI() {
-    // (Pre-populated by generate calls)
+    renderBodyImages(state.generatedImages.body || []);
+    renderBodyPromptEditors(state.generatedImages.body || []);
+    renderImagePositionEditor("export");
+    renderExportWechatPreview();
   }
 
   dom.btnGenCover.addEventListener("click", function () { generateCover(); });
@@ -740,8 +779,7 @@
         btnRegen.style.display = "";
       }
       toast("封面图 " + (d.image_urls && d.image_urls.length ? "生成成功" : "生成失败"), d.image_urls && d.image_urls.length ? "success" : "error");
-      // Refresh WeChat preview to show new images
-      if (currentPreviewTab === "wechat") { renderWechatPreview(); }
+      refreshVisibleWechatPreviews();
     } catch (e) {
       toast("封面生成失败: " + e.message, "error");
     } finally {
@@ -813,9 +851,9 @@
       state.generatedImages.body = d.images || [];
       renderBodyImages(d.images || []);
       renderBodyPromptEditors(d.images || []);
-      toast(d.total + " 张配图生成完成", "success");
-      // Refresh WeChat preview to show new images
-      if (currentPreviewTab === "wechat") { renderWechatPreview(); }
+      var failedCount = (d.images || []).filter(function (img) { return img && img.status === "failed"; }).length;
+      toast(d.total + " 张配图返回完成" + (failedCount ? "，其中 " + failedCount + " 张需重试" : ""), failedCount ? "info" : "success");
+      refreshVisibleWechatPreviews();
     } catch (e) {
       var errMsg = e.name === "AbortError" ? "请求超时（>180s），请重试" : e.message;
       toast("配图生成失败: " + errMsg, "error");
@@ -840,6 +878,14 @@
           '" title="用相同 Prompt 重新生成">🔄</button><button class="btn-edit-prompt" data-idx="' +
           i +
           '" title="编辑 Prompt">✏️</button></div>';
+      } else if (img && img.status === "failed") {
+        slots +=
+          '<div class="image-slot failed" data-slot="' + i + '">' +
+          '<span>图 ' + (i + 1) + ' 生成失败</span>' +
+          '<small>' + escHtml(img.error || "图片接口未返回结果") + '</small>' +
+          '<button class="btn-regenerate" data-idx="' + i + '" title="用相同 Prompt 重新生成">🔄</button>' +
+          '<button class="btn-edit-prompt" data-idx="' + i + '" title="编辑 Prompt">✏️</button>' +
+          '</div>';
       } else {
         slots += '<div class="image-slot empty" data-slot="' + i + '"><span>图 ' + (i + 1) + "</span></div>";
       }
@@ -862,14 +908,21 @@
             body: JSON.stringify({ custom_prompts: [currentPrompt], count: 1 }),
           });
           var d = await r.json();
-          if (d.images && d.images.length) {
+          if (d.images && d.images.length && d.images[0].image_urls && d.images[0].image_urls.length) {
             d.images[0].index = idx;
             state.generatedImages.body[idx] = d.images[0];
             renderBodyImages(state.generatedImages.body);
             renderBodyPromptEditors(state.generatedImages.body);
             toast("图 " + (idx + 1) + " 重新生成成功", "success");
-            // Refresh WeChat preview to reflect new image
-            if (currentPreviewTab === "wechat") { renderWechatPreview(); }
+            refreshVisibleWechatPreviews();
+          } else {
+            toast("图 " + (idx + 1) + " 生成失败", "error");
+            if (d.images && d.images[0]) {
+              d.images[0].index = idx;
+              state.generatedImages.body[idx] = d.images[0];
+              renderBodyImages(state.generatedImages.body);
+              renderBodyPromptEditors(state.generatedImages.body);
+            }
           }
         } catch (e) {
           toast("重新生成失败: " + e.message, "error");
@@ -929,16 +982,21 @@
             body: JSON.stringify({ custom_prompts: [newPrompt], count: 1 }),
           });
           var d = await r.json();
-          if (d.images && d.images.length) {
+          if (d.images && d.images.length && d.images[0].image_urls && d.images[0].image_urls.length) {
             d.images[0].index = idx;
             state.generatedImages.body[idx] = d.images[0];
             renderBodyImages(state.generatedImages.body);
             renderBodyPromptEditors(state.generatedImages.body);
             toast("图 " + (idx + 1) + " 重新生成成功", "success");
-            // Refresh WeChat preview to reflect new image
-            if (currentPreviewTab === "wechat") { renderWechatPreview(); }
+            refreshVisibleWechatPreviews();
           } else {
             toast("图 " + (idx + 1) + " 生成失败", "error");
+            if (d.images && d.images[0]) {
+              d.images[0].index = idx;
+              state.generatedImages.body[idx] = d.images[0];
+              renderBodyImages(state.generatedImages.body);
+              renderBodyPromptEditors(state.generatedImages.body);
+            }
           }
         } catch (e) {
           toast("重新生成失败: " + e.message, "error");
@@ -1056,7 +1114,7 @@
         dom.articlePreview.innerHTML = marked.parse(d.article.content);
         dom.articleCharCount.textContent = d.article.char_count + " 字";
         dom.previewActions.style.display = "flex";
-        if (currentPreviewTab === "wechat") { renderWechatPreview(); }
+        refreshVisibleWechatPreviews();
 
         // Extract the best news item from search
         if (d.keyword) {
@@ -1266,9 +1324,7 @@
 
       // Switch to preview
       goToStep(2);
-      if (currentPreviewTab === "wechat") {
-        renderWechatPreview();
-      }
+      refreshVisibleWechatPreviews();
 
       var rewriteTemperatureNote = d.rewrite_mode === "recompose" ? " · 自由度 " + Number(d.rewrite_temperature || 0).toFixed(2) : "";
       var originalityNote = d.originality_retry_count > 0 ? " · 已降低照搬率" : "";

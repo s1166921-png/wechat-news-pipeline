@@ -98,6 +98,58 @@ class FlaskSmokeTests(unittest.TestCase):
         self.assertEqual(response.get_json()["status"], "ok")
 
 
+class ImageGenerationTests(unittest.TestCase):
+    def test_select_image_sections_returns_requested_count_from_short_blocks(self):
+        content = "\n\n".join([
+            "# 标题",
+            "## 一、背景",
+            "短段落。",
+            "| 类型 | 风险 |",
+            "| --- | --- |",
+            "| A | 高 |",
+            "企业需要检查供应商资质、合同条款、发票流向和物流单证，避免退税链路被异常上游拖累。",
+            "结尾建议建立月度复盘清单。",
+        ])
+
+        sections = app._select_image_sections(content, count=3)
+
+        self.assertEqual(len(sections), 3)
+        self.assertTrue(all(section.strip() for section in sections))
+        self.assertEqual(len(set(sections)), 3)
+
+    def test_generate_image_keeps_failed_slot_visible(self):
+        client = app.app.test_client()
+        article = "\n\n".join([
+            "第一段正文说明供应商异常会影响退税申报，需要企业在交易前核验基础资料。",
+            "第二段正文说明函调流程会拉长资金周转周期，财务团队要准备现金流预案。",
+            "第三段正文说明合同、发票、物流和付款记录需要保持一致，方便后续核查。",
+        ])
+        calls = []
+
+        def fake_image(prompt, size="body", n=1):
+            calls.append(prompt)
+            if len(calls) == 2:
+                return []
+            return ["https://example.com/image-%d.png" % len(calls)]
+
+        with patch("app._build_image_prompt", side_effect=lambda text, image_type="body": "prompt:" + text[:8]), \
+             patch("app._generate_ark_image", side_effect=fake_image), \
+             patch("app._download_image", return_value=False):
+            response = client.post("/api/generate-image", json={
+                "article_content": article,
+                "count": 3,
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["total"], 3)
+        self.assertEqual(len(data["images"]), 3)
+        self.assertEqual(data["images"][1]["status"], "failed")
+        self.assertIn("未返回图片", data["images"][1]["error"])
+        self.assertEqual(data["images"][0]["status"], "ok")
+        self.assertEqual(data["images"][2]["status"], "ok")
+
+
 class RewriteEndpointTests(unittest.TestCase):
     def test_rewrite_raw_content_reports_extraction_metadata(self):
         client = app.app.test_client()

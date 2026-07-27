@@ -307,6 +307,15 @@ body {
   overflow: hidden; position: relative;
 }
 .image-slot.empty { color: var(--text-secondary); font-size: 13px; }
+.image-slot.failed {
+  flex-direction: column; gap: 6px; padding: 12px;
+  border-color: #fecaca; background: #fef2f2; color: #991b1b;
+  text-align: center; font-size: 13px;
+}
+.image-slot.failed small {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; font-size: 11px; line-height: 1.4; color: #b91c1c;
+}
 .image-slot img { width: 100%; height: 100%; object-fit: cover; }
 .image-slot .btn-regenerate {
   position: absolute; bottom: 6px; right: 6px;
@@ -320,12 +329,32 @@ body {
 
 /* ── Export ─────────────────────────────── */
 
-.export-section {
+.export-section,
+.wechat-export-section {
   background: var(--card); border-radius: var(--radius);
   box-shadow: var(--shadow); overflow: hidden;
 }
 .export-buttons { display: flex; gap: 10px; padding: 16px; flex-wrap: wrap; }
 .export-status { padding: 0 16px 14px; font-size: 13px; min-height: 20px; }
+.wechat-export-layout {
+  display: grid; grid-template-columns: minmax(320px, 440px) 1fr;
+  gap: 16px; align-items: start; padding: 16px;
+  background: #f8f9fb;
+}
+.export-phone-wrapper {
+  max-height: 680px; min-height: 560px; padding: 12px;
+  background: #f0f0f0; border-radius: var(--radius-sm);
+}
+.export-image-position-editor {
+  margin-top: 0; min-width: 0;
+}
+.export-image-position-editor h4 span {
+  font-weight: 400; font-size: 11px; color: var(--text-secondary);
+}
+@media (max-width: 900px) {
+  .wechat-export-layout { grid-template-columns: 1fr; }
+  .export-phone-wrapper { max-height: 620px; }
+}
 
 /* ── Auto Pipeline ──────────────────────── */
 

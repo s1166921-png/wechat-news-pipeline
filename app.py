@@ -2391,6 +2391,86 @@ def _download_image(img_url, save_path):
     return False
 
 
+def _select_image_sections(article_content, count=3, min_chars=50):
+    """Pick enough article sections for body image prompts.
+
+    Markdown articles can contain many short headings, bullets, and table rows.
+    A strict paragraph-only split may return fewer sections than requested,
+    leaving visible image slots empty. We merge adjacent short blocks and fall
+    back to rolling windows so each requested slot gets a prompt candidate.
+    """
+    import re as _re
+
+    target = max(1, min(int(count or 3), 4))
+    text = (article_content or "").strip()
+    if not text:
+        return []
+
+    raw_blocks = [
+        _re.sub(r"\s+", " ", block).strip()
+        for block in _re.split(r"\n\s*\n", text)
+        if block and block.strip()
+    ]
+    if not raw_blocks:
+        raw_blocks = [_re.sub(r"\s+", " ", text)]
+
+    sections = []
+    buffer = ""
+    for block in raw_blocks:
+        cleaned = _re.sub(r"^#{1,6}\s*", "", block).strip()
+        cleaned = _re.sub(r"^\|[\s\-:|]+\|$", "", cleaned).strip()
+        if not cleaned:
+            continue
+        buffer = (buffer + "\n" + cleaned).strip() if buffer else cleaned
+        if len(buffer) >= min_chars:
+            sections.append(buffer)
+            buffer = ""
+        if len(sections) >= target:
+            break
+
+    if buffer and len(sections) < target:
+        sections.append(buffer)
+
+    flat_text = _re.sub(r"\s+", " ", text)
+    existing = set(sections)
+    sentence_parts = [
+        part.strip()
+        for part in _re.split(r"(?<=[。！？!?])", flat_text)
+        if part and part.strip()
+    ]
+    sentence_buffer = ""
+    for part in sentence_parts:
+        sentence_buffer = (sentence_buffer + part).strip()
+        if len(sentence_buffer) >= 32:
+            if sentence_buffer not in existing:
+                sections.append(sentence_buffer)
+                existing.add(sentence_buffer)
+            sentence_buffer = ""
+        if len(sections) >= target:
+            break
+    if sentence_buffer and len(sections) < target and sentence_buffer not in existing:
+        sections.append(sentence_buffer)
+        existing.add(sentence_buffer)
+
+    cursor = 0
+    while len(sections) < target and flat_text:
+        window = flat_text[cursor:cursor + 220].strip()
+        if not window:
+            cursor = 0
+            window = flat_text[:220].strip()
+        if window and window not in existing:
+            sections.append(window)
+            existing.add(window)
+        cursor += 180
+        if cursor >= len(flat_text) and len(sections) < target:
+            cursor = max(0, len(flat_text) - 220)
+            repeated = flat_text[cursor:cursor + 220].strip()
+            if repeated in existing:
+                break
+
+    return sections[:target]
+
+
 # ╔══════════════════════════════════════════════════════╗
 # ║  API Routes                                         ║
 # ╚══════════════════════════════════════════════════════╝
@@ -3185,12 +3265,13 @@ def api_generate_image():
                 "index": i, "prompt": cp, "image_urls": local_urls or urls,
                 "external_image_urls": urls, "local_image_urls": local_urls,
                 "saved_paths": saved, "section_excerpt": cp[:100],
+                "status": "ok" if urls else "failed",
+                "error": "" if urls else "图片生成接口未返回图片，请调整 Prompt 后重试",
             })
         return jsonify({"images": results, "total": len(results)})
 
-    # Otherwise extract from article content
-    paragraphs = [p.strip() for p in article_content.split("\n\n") if len(p.strip()) > 50]
-    key_sections = paragraphs[:count] if len(paragraphs) >= count else paragraphs
+    # Otherwise extract enough article sections for the requested image count.
+    key_sections = _select_image_sections(article_content, count)
 
     results = []
     for i, section in enumerate(key_sections):
@@ -3212,6 +3293,8 @@ def api_generate_image():
             "index": i, "prompt": prompt, "image_urls": local_urls or urls,
             "external_image_urls": urls, "local_image_urls": local_urls,
             "saved_paths": saved, "section_excerpt": section[:100],
+            "status": "ok" if urls else "failed",
+            "error": "" if urls else "图片生成接口未返回图片，请编辑 Prompt 后重试",
         })
 
     return jsonify({"images": results, "total": len(results)})

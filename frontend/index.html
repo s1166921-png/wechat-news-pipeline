@@ -342,6 +342,49 @@
         </div>
         <div id="export-status" class="export-status"></div>
       </div>
+
+      <!-- WeChat article preview with images -->
+      <div class="wechat-export-section">
+        <div class="panel-header">
+          <h3>📱 微信图文预览</h3>
+          <span class="text-muted">导出前检查图片是否已插入正文</span>
+        </div>
+        <div class="wechat-export-layout">
+          <div class="phone-frame-wrapper export-phone-wrapper">
+            <div class="phone-frame">
+              <div class="phone-statusbar">
+                <span class="phone-time">9:41</span>
+                <span class="phone-icons">📶 🔋</span>
+              </div>
+              <div class="phone-titlebar">
+                <span class="phone-back">←</span>
+                <span class="phone-title-text">公众号文章</span>
+                <span class="phone-more">•••</span>
+              </div>
+              <div class="phone-article-header">
+                <div class="phone-article-title" id="export-wechat-title">文章标题</div>
+                <div class="phone-article-meta">
+                  <span id="export-wechat-date">2026年7月27日</span>
+                </div>
+              </div>
+              <div class="phone-article-body" id="export-wechat-body">
+                <p class="text-muted">生成文章和配图后，在这里预览最终微信图文效果。</p>
+              </div>
+              <div class="phone-article-footer">
+                <span>❤️ 好看</span>
+                <span>⭐ 收藏</span>
+                <span>↗ 分享</span>
+              </div>
+            </div>
+          </div>
+          <div class="image-position-editor export-image-position-editor" id="export-image-position-editor">
+            <h4>🖼️ 配图位置管理 <span>上移 / 下移 / 移除后会同步刷新预览和导出</span></h4>
+            <div class="image-position-list" id="export-image-position-list">
+              <div class="no-images-hint">暂无配图，请先生成封面或正文配图。</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Auto pipeline button -->
