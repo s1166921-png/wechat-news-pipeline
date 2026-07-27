@@ -5,6 +5,8 @@ from pipeline_core.facts import (
     extract_soft_claims,
     find_unsupported_fact_tokens,
     find_unsupported_soft_claims,
+    neutralize_unsupported_soft_claims,
+    remove_unsupported_fact_sentences,
 )
 
 
@@ -58,3 +60,25 @@ class FactTokenTests(unittest.TestCase):
         unsupported = find_unsupported_soft_claims(output, source)
 
         self.assertEqual([], unsupported)
+
+    def test_neutralize_unsupported_soft_claims_softens_absolute_markers(self):
+        source = "原文提到退税周期可能延长到3-6个月，企业需要关注供应商合规。"
+        output = "核心原因并非系统故障，而是供应商合规异常直接冲击现金流。"
+
+        neutralized = neutralize_unsupported_soft_claims(output, source)
+
+        self.assertNotIn("核心原因", neutralized)
+        self.assertNotIn("直接冲击", neutralized)
+        self.assertEqual([], find_unsupported_soft_claims(neutralized, source))
+
+    def test_remove_unsupported_fact_sentences_drops_hallucinated_case_numbers(self):
+        source = "原文提到视同内销会按13%增值税处理。"
+        output = "原文提到视同内销会按13%增值税处理。以单笔出口额100万元、毛利率15%的订单为例，补税13万元。"
+
+        cleaned = remove_unsupported_fact_sentences(output, source)
+
+        self.assertIn("13%增值税", cleaned)
+        self.assertNotIn("100万元", cleaned)
+        self.assertNotIn("15%", cleaned)
+        self.assertNotIn("13万元", cleaned)
+        self.assertEqual([], find_unsupported_fact_tokens(cleaned, source))

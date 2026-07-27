@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from pipeline_core import extractors as _core_extractors
 from pipeline_core import facts as _core_facts
 from pipeline_core import importing as _core_importing
+from pipeline_core import originality as _core_originality
 from pipeline_core import quality as _core_quality
 
 # ── 路径常量 ──────────────────────────────────────────
@@ -4168,6 +4169,25 @@ def api_rewrite_article():
         system_prompt = B2C_SYSTEM_PROMPT
         style_label = "卖家亲测 (B2C)"
 
+    style_execution_blocks = {
+        "b2p": """B2P风格执行清单：
+- 身份：政策分析师/行业观察者，不是新闻搬运工
+- 结构：标题 + 开头事实 + PART 1/PART 2/PART 3 + 结尾
+- 写法：把原文事实拆成政策背景、核心变化、实操建议
+- 禁止：照搬原文段落顺序、照搬原文长句、营销 CTA""",
+        "b2b": """B2B风格执行清单：
+- 身份：行业分析师，写给跨境企业负责人和运营团队
+- 结构：核心结论 + 业务影响 + 对比表格/清单 + 行动建议
+- 写法：专业、克制、像行研简报；多用“风险点/适用场景/操作建议”
+- 禁止：个人口吻、亲测经历、照搬原文段落顺序、照搬原文长句""",
+        "b2c": """B2C风格执行清单：
+- 身份：一线卖家/亲历者，写给同行
+- 结构：真实场景开头 + 踩坑/选择过程 + 可执行经验 + 反问结尾
+- 写法：口语化、有温度，但事实仍只来自原文
+- 禁止：行研报告腔、政策公文腔、照搬原文段落顺序、照搬原文长句""",
+    }
+    style_execution_block = style_execution_blocks[style]
+
     # ── Build rewrite prompt ──
     angle_instruction = ""
     if custom_angle:
@@ -4207,6 +4227,9 @@ def api_rewrite_article():
 
 === 原文硬事实清单（输出中出现的日期/数字/政策编号/金额/比例必须来自这里或原文逐字可见） ===
 {fact_token_block}
+
+=== 本次必须执行的写作风格 ===
+{style_execution_block}
 {rewrite_mode_instruction}
 
 === 原文内容 ===
@@ -4227,17 +4250,54 @@ def api_rewrite_article():
     if not rewritten_md:
         return jsonify({"error": "AI 改写失败，请重试"}), 500
 
+    originality_report_initial = _core_originality.assess_rewrite_originality(rewritten_md, source_content)
+    originality_report = originality_report_initial
+    originality_retry_count = 0
+    if not originality_report_initial["acceptable"]:
+        copied_examples = "；".join(originality_report_initial.get("copied_passages", [])[:3]) or "存在连续照搬原文片段"
+        originality_prompt = f"""这篇稿件照搬率过高，请重新输出完整文章。
+
+照搬率问题：
+- 最长连续照搬字符数：{originality_report_initial["max_copied_run"]}
+- 疑似照搬片段：{copied_examples}
+
+硬性改写要求：
+1. 不得连续照搬原文长句，单个连续相同片段尽量控制在 24 个中文字符以内
+2. 必须改变开头、段落顺序、小标题和句式节奏
+3. 必须执行本次写作风格：{style_label}
+4. 事实、日期、金额、比例、政策编号仍然只能来自原文
+5. 直接输出重新编写后的完整 Markdown 文章
+
+=== 风格执行清单 ===
+{style_execution_block}
+
+=== 原文内容 ===
+{source_content}
+
+=== 照搬率过高的稿件 ===
+{rewritten_md}"""
+        reworked_md = llm_chat_text(
+            system=system_prompt,
+            user=originality_prompt,
+            temperature=max(rewrite_temperature, 0.75),
+            max_tokens=4096,
+        )
+        if reworked_md:
+            rewritten_md = reworked_md
+            originality_retry_count = 1
+            originality_report = _core_originality.assess_rewrite_originality(rewritten_md, source_content)
+
     fact_warnings_initial = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
     soft_claim_warnings_initial = _core_facts.find_unsupported_soft_claims(rewritten_md, source_content)
     fact_warnings = fact_warnings_initial
     soft_claim_warnings = soft_claim_warnings_initial
     fact_guard_retry_count = 0
-    if fact_warnings_initial or soft_claim_warnings_initial:
+    while (fact_warnings or soft_claim_warnings) and fact_guard_retry_count < 2:
         unsupported_blocks = []
-        if fact_warnings_initial:
-            unsupported_blocks.append("未支持硬事实：" + ", ".join(fact_warnings_initial))
-        if soft_claim_warnings_initial:
-            unsupported_blocks.append("未支持判断：" + "；".join(soft_claim_warnings_initial))
+        if fact_warnings:
+            unsupported_blocks.append("未支持硬事实：" + ", ".join(fact_warnings))
+        if soft_claim_warnings:
+            unsupported_blocks.append("未支持判断：" + "；".join(soft_claim_warnings))
         retry_prompt = f"""你刚才的改写中出现了原文没有支持的硬事实，请重新输出完整文章。
 
 必须删除或改成原文可支撑的保守表达：
@@ -4261,13 +4321,23 @@ def api_rewrite_article():
             temperature=0.3,
             max_tokens=4096,
         )
-        if corrected_md:
-            rewritten_md = corrected_md
-            fact_guard_retry_count = 1
+        if not corrected_md:
+            break
+        rewritten_md = corrected_md
+        fact_guard_retry_count += 1
+        fact_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
+        soft_claim_warnings = _core_facts.find_unsupported_soft_claims(rewritten_md, source_content)
+
+    if fact_warnings or soft_claim_warnings:
+        print(f"  [FactGuard] unsupported items remain after retry: facts={fact_warnings[:8]}, soft={soft_claim_warnings[:8]}")
+        if fact_warnings:
+            rewritten_md = _core_facts.remove_unsupported_fact_sentences(rewritten_md, source_content)
             fact_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
             soft_claim_warnings = _core_facts.find_unsupported_soft_claims(rewritten_md, source_content)
-            if fact_warnings or soft_claim_warnings:
-                print(f"  [FactGuard] unsupported items remain after retry: facts={fact_warnings[:8]}, soft={soft_claim_warnings[:8]}")
+        if soft_claim_warnings:
+            rewritten_md = _core_facts.neutralize_unsupported_soft_claims(rewritten_md, source_content)
+            soft_claim_warnings = _core_facts.find_unsupported_soft_claims(rewritten_md, source_content)
+            fact_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
 
     # ── Convert to WeChat HTML ──
     rewritten_html = _markdown_to_wechat_html(
@@ -4299,6 +4369,9 @@ def api_rewrite_article():
         "soft_claim_warnings": soft_claim_warnings,
         "soft_claim_warnings_initial": soft_claim_warnings_initial,
         "fact_guard_retry_count": fact_guard_retry_count,
+        "originality_report": originality_report,
+        "originality_report_initial": originality_report_initial,
+        "originality_retry_count": originality_retry_count,
         "import_mode": import_info["mode"],
         "import_recommendation": import_info["recommendation"],
         "import_message": import_info["message"],

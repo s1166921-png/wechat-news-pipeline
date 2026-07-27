@@ -46,6 +46,28 @@ SOFT_CLAIM_PATTERNS = [
     "主要原因",
 ]
 
+SOFT_CLAIM_NEUTRAL_REPLACEMENTS = {
+    "近期发布": "原文提到",
+    "最新发布": "原文提到",
+    "正式发布": "原文提到",
+    "落地实施": "提到",
+    "释放出明确信号": "提示",
+    "明确信号": "相关提示",
+    "底层逻辑": "需要关注的背景",
+    "本质上是": "可以理解为",
+    "意味着": "可能意味着",
+    "直接冲击": "可能影响",
+    "直接影响": "可能影响",
+    "监管升级": "合规要求变化",
+    "审核收紧": "审核要求变化",
+    "政策收紧": "政策要求变化",
+    "全面收紧": "要求变化",
+    "显著提升": "有所提升",
+    "明显增加": "有所增加",
+    "核心原因": "需要关注的原因",
+    "主要原因": "需要关注的原因",
+}
+
 
 def normalize_fact_token(token):
     token = (token or "").strip()
@@ -87,6 +109,36 @@ def find_unsupported_fact_tokens(output_text, source_text):
     return unsupported
 
 
+def remove_unsupported_fact_sentences(output_text, source_text):
+    """Remove sentences or markdown table/list lines that contain unsupported hard facts."""
+    unsupported = find_unsupported_fact_tokens(output_text, source_text)
+    if not unsupported:
+        return output_text or ""
+
+    cleaned_lines = []
+    for line in (output_text or "").splitlines():
+        if not line.strip():
+            cleaned_lines.append(line)
+            continue
+        if line.lstrip().startswith("|") or line.lstrip().startswith(("- ", "* ", "+ ")) or re.match(r"^\s*\d+[\.\)]\s+", line):
+            if any(token in line for token in unsupported):
+                continue
+            cleaned_lines.append(line)
+            continue
+
+        parts = re.split(r"(?<=[。！？!?；;])", line)
+        kept_parts = []
+        for part in parts:
+            if part and any(token in part for token in unsupported):
+                continue
+            kept_parts.append(part)
+        cleaned_line = "".join(kept_parts).strip()
+        if cleaned_line:
+            cleaned_lines.append(cleaned_line)
+
+    return "\n".join(cleaned_lines)
+
+
 def extract_soft_claims(text):
     """Extract interpretation-heavy claims that should be grounded by source wording."""
     text = text or ""
@@ -112,3 +164,13 @@ def find_unsupported_soft_claims(output_text, source_text):
         if marker not in source_text:
             unsupported.append(f"{marker}: {claim['sentence']}")
     return unsupported
+
+
+def neutralize_unsupported_soft_claims(output_text, source_text):
+    """Soften unsupported interpretation markers without changing hard facts."""
+    source_text = source_text or ""
+    neutralized = output_text or ""
+    for marker, replacement in SOFT_CLAIM_NEUTRAL_REPLACEMENTS.items():
+        if marker not in source_text:
+            neutralized = neutralized.replace(marker, replacement)
+    return neutralized

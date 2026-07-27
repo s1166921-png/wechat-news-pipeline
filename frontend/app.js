@@ -1271,8 +1271,9 @@
       }
 
       var rewriteTemperatureNote = d.rewrite_mode === "recompose" ? " · 自由度 " + Number(d.rewrite_temperature || 0).toFixed(2) : "";
+      var originalityNote = d.originality_retry_count > 0 ? " · 已降低照搬率" : "";
       rewriteStatus.className = "rewrite-status success";
-      rewriteStatus.textContent = "✅ " + (d.rewrite_mode === "recompose" ? "重新编写完成" : "改写完成") + "！原文 " + d.original_char_count + " 字 → 成文 " + d.char_count + " 字 (" + formatImportMeta(d) + ")" + rewriteTemperatureNote + factGuardNote;
+      rewriteStatus.textContent = "✅ " + (d.rewrite_mode === "recompose" ? "重新编写完成" : "改写完成") + "！原文 " + d.original_char_count + " 字 → 成文 " + d.char_count + " 字 (" + formatImportMeta(d) + ")" + rewriteTemperatureNote + originalityNote + factGuardNote;
     } catch (e) {
       rewriteStatus.className = "rewrite-status error";
       rewriteStatus.textContent = "❌ 改写失败: " + e.message;

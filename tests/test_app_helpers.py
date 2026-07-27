@@ -222,6 +222,72 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertNotIn("2026年7月15日", data["rewritten_markdown"])
         self.assertNotIn("37%", data["rewritten_markdown"])
 
+    def test_rewrite_fact_guard_can_retry_twice_until_clean(self):
+        client = app.app.test_client()
+        calls = []
+
+        def fake_llm(**kwargs):
+            calls.append(kwargs["user"])
+            if len(calls) == 1:
+                return "# 标题\n\n原文提到退税周期为3-6个月，新增利润下降37%。"
+            if len(calls) == 2:
+                return "# 标题\n\n原文提到退税周期为3-6个月，建议关注2个风险。"
+            return "# 标题\n\n原文提到退税周期为3-6个月，建议关注供应商合规。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": "原文只提到退税周期为3-6个月，企业需要关注供应商合规。" * 30,
+                "style": "b2b",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["fact_guard_retry_count"], 2)
+        self.assertIn("37%", data["fact_warnings_initial"])
+        self.assertEqual([], data["fact_warnings"])
+        self.assertNotIn("2个", data["rewritten_markdown"])
+
+    def test_rewrite_neutralizes_soft_claims_that_remain_after_retries(self):
+        client = app.app.test_client()
+
+        def fake_llm(**kwargs):
+            return "# 标题\n\n核心原因并非系统故障，而是供应商合规异常直接冲击现金流。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": "原文提到退税周期可能延长到3-6个月，企业需要关注供应商合规。" * 30,
+                "style": "b2b",
+                "rewrite_mode": "recompose",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(2, data["fact_guard_retry_count"])
+        self.assertEqual([], data["soft_claim_warnings"])
+        self.assertNotIn("核心原因", data["rewritten_markdown"])
+        self.assertNotIn("直接冲击", data["rewritten_markdown"])
+
+    def test_rewrite_removes_hard_fact_sentences_that_remain_after_retries(self):
+        client = app.app.test_client()
+
+        def fake_llm(**kwargs):
+            return "# 标题\n\n原文提到视同内销会按13%增值税处理。以单笔出口额100万元、毛利率15%的订单为例，补税13万元。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": "原文提到视同内销会按13%增值税处理。" * 30,
+                "style": "b2b",
+                "rewrite_mode": "recompose",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], data["fact_warnings"])
+        self.assertIn("13%增值税", data["rewritten_markdown"])
+        self.assertNotIn("100万元", data["rewritten_markdown"])
+        self.assertNotIn("15%", data["rewritten_markdown"])
+        self.assertNotIn("13万元", data["rewritten_markdown"])
+
     def test_rewrite_retries_when_generated_text_has_unsupported_soft_claims(self):
         client = app.app.test_client()
         calls = []
@@ -273,6 +339,38 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertIn("重新编写", captured["user"])
         self.assertIn("不要沿用原文段落顺序", captured["user"])
         self.assertIn("不得逐句改写", captured["user"])
+        self.assertIn("B2B风格执行清单", captured["user"])
+        self.assertIn("行业分析师", captured["user"])
+
+    def test_rewrite_retries_when_output_copies_source_too_much(self):
+        client = app.app.test_client()
+        source = (
+            "跨境卖家在准备出口退税资料时，应核对发票、报关单、物流凭证和收汇资料之间的一致性，"
+            "避免因为上游供应商异常导致退税流程卡住。企业还需要建立供应商准入和单证复核机制。"
+        ) * 6
+        calls = []
+
+        def fake_llm(**kwargs):
+            calls.append(kwargs["user"])
+            if len(calls) == 1:
+                return "# 标题\n\n" + source[:180]
+            return "# 标题\n\n如果退税周期和供应商合规挂钩，卖家需要把发票、报关单、物流凭证和收汇资料放到同一张核查表里。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": source,
+                "style": "b2b",
+                "rewrite_mode": "recompose",
+                "temperature": 0.85,
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["originality_retry_count"], 1)
+        self.assertFalse(data["originality_report_initial"]["acceptable"])
+        self.assertTrue(data["originality_report"]["acceptable"])
+        self.assertIn("照搬率过高", calls[1])
+        self.assertNotIn(source[:70], data["rewritten_markdown"])
 
 
 class FrontendRewriteUiTests(unittest.TestCase):
