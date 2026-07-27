@@ -2515,6 +2515,13 @@ def _image_ref_url(value):
     return value or ""
 
 
+def _image_ref_excerpt(value):
+    """Return the article excerpt an image should be matched against."""
+    if isinstance(value, dict):
+        return value.get("section_excerpt") or value.get("excerpt") or ""
+    return ""
+
+
 def _local_output_image_path_from_url(url):
     """Resolve a public /output/images URL or local path to a safe local file."""
     from urllib.parse import parse_qs, unquote, urlparse
@@ -3624,7 +3631,7 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
     flush_list()
     flush_table()
 
-    # ── Phase 2: Insert images at strategic positions ──
+    # ── Phase 2: Insert images next to their matched article sections ──
     body_html = '\n'.join(out_lines)
     if images and isinstance(images, dict) and len(images) > 0:
         # Sort: "cover" first, then numeric keys
@@ -3636,54 +3643,92 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
                 return (int(k), "")
             except (ValueError, TypeError):
                 return (9999, k)
-        img_urls = [
-            _image_ref_url(v)
+        image_items = [
+            (k, v, _image_ref_url(v), _image_ref_excerpt(v))
             for k, v in sorted(images.items(), key=_img_sort_key)
             if _image_ref_url(v)
         ]
-        if img_urls:
-            # Find all paragraph-ending positions
-            end_positions = [m.end() for m in _re.finditer(
-                r'(</p>|</h[1-4]>|</blockquote>|</table>|</ul>|</ol>|</li>|</hr>)', body_html
-            )]
-            if len(end_positions) >= 2 and len(img_urls) >= 2:
-                # Cover after first block element
-                insert_pos = end_positions[0]
+
+        def _strip_html(html):
+            text = _re.sub(r'<[^>]+>', '', html or '')
+            text = _re.sub(r'&nbsp;', ' ', text)
+            return _re.sub(r'\s+', '', text)
+
+        def _text_similarity(excerpt, block_text):
+            a = _re.sub(r'\s+', '', excerpt or '')
+            b = _re.sub(r'\s+', '', block_text or '')
+            if not a or not b:
+                return 0.0
+            if a in b or b in a:
+                return min(len(a), len(b)) / max(len(a), len(b))
+            if len(a) < 2 or len(b) < 2:
+                return 1.0 if a == b else 0.0
+            a2 = {a[i:i + 2] for i in range(len(a) - 1)}
+            b2 = {b[i:i + 2] for i in range(len(b) - 1)}
+            return len(a2 & b2) / max(1, len(a2 | b2))
+
+        block_pattern = _re.compile(
+            r'(<(?P<tag>p|h[1-4]|blockquote|table|ul|ol)\b[\s\S]*?</(?P=tag)>|<hr\b[^>]*>)',
+            _re.I
+        )
+        blocks = [
+            {
+                "start": m.start(),
+                "end": m.end(),
+                "text": _strip_html(m.group(0)),
+            }
+            for m in block_pattern.finditer(body_html)
+        ]
+
+        if image_items and blocks:
+            insertions = []
+            used_block_indexes = set()
+            order = 0
+
+            cover_item = next((item for item in image_items if item[0] == "cover"), None)
+            if cover_item:
                 cover_html = (
                     f'<p style="text-align:center;margin:16px 0">'
-                    f'<img src="{img_urls[0]}" '
+                    f'<img src="{cover_item[2]}" '
                     f'style="max-width:100%;height:auto;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1)" '
                     f'alt="封面图"></p>'
                 )
-                body_html = body_html[:insert_pos] + '\n' + cover_html + '\n' + body_html[insert_pos:]
+                insertions.append((blocks[0]["end"], order, cover_html))
+                used_block_indexes.add(0)
+                order += 1
 
-                # Distribute body images across remaining paragraphs
-                body_imgs = img_urls[1:]
-                if body_imgs and len(end_positions) > 3:
-                    step = max(1, (len(end_positions) - 1) // (len(body_imgs) + 1))
-                    accumulated_shift = len(cover_html) + 2
-                    for idx, img_url in enumerate(body_imgs):
-                        split_idx = min((idx + 1) * step + 1, len(end_positions) - 1)
-                        pos = end_positions[split_idx] + accumulated_shift
-                        img_html = (
-                            f'<p style="text-align:center;margin:16px 0">'
-                            f'<img src="{img_url}" '
-                            f'style="max-width:100%;height:auto;border-radius:4px" '
-                            f'alt="配图{idx + 1}"></p>'
-                        )
-                        body_html = body_html[:pos] + '\n' + img_html + '\n' + body_html[pos:]
-                        accumulated_shift += len(img_html) + 2
-            elif len(img_urls) >= 1:
-                # Just one image: insert after first paragraph
-                first_p = body_html.find('</p>')
-                if first_p > 0:
-                    img_html = (
-                        f'<p style="text-align:center;margin:16px 0">'
-                        f'<img src="{img_urls[0]}" '
-                        f'style="max-width:100%;height:auto;border-radius:6px" '
-                        f'alt="配图"></p>'
-                    )
-                    body_html = body_html[:first_p + 4] + '\n' + img_html + '\n' + body_html[first_p + 4:]
+            body_items = [item for item in image_items if item[0] != "cover"]
+            fallback_cursor = 1 if len(blocks) > 1 else 0
+            for idx, (_, _, img_url, excerpt) in enumerate(body_items):
+                best_idx = None
+                best_score = 0.0
+                if excerpt:
+                    for block_idx, block in enumerate(blocks):
+                        if block_idx in used_block_indexes:
+                            continue
+                        score = _text_similarity(excerpt, block["text"])
+                        if score > best_score:
+                            best_score = score
+                            best_idx = block_idx
+
+                if best_idx is None or best_score < 0.08:
+                    while fallback_cursor in used_block_indexes and fallback_cursor < len(blocks) - 1:
+                        fallback_cursor += 1
+                    best_idx = min(fallback_cursor, len(blocks) - 1)
+                    fallback_cursor += 1
+
+                used_block_indexes.add(best_idx)
+                img_html = (
+                    f'<p style="text-align:center;margin:16px 0">'
+                    f'<img src="{img_url}" '
+                    f'style="max-width:100%;height:auto;border-radius:4px" '
+                    f'alt="配图{idx + 1}"></p>'
+                )
+                insertions.append((blocks[best_idx]["end"], order, img_html))
+                order += 1
+
+            for pos, _, html in sorted(insertions, key=lambda item: (item[0], item[1]), reverse=True):
+                body_html = body_html[:pos] + '\n' + html + '\n' + body_html[pos:]
 
     # ── Phase 3: Wrap in full document ──
     full_html = f"""<!DOCTYPE html>

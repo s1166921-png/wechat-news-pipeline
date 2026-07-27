@@ -487,6 +487,36 @@ class ImageEmbeddingTests(unittest.TestCase):
         self.assertIn('src="/api/generated-image?file=body.png"', html)
         self.assertNotIn("{'url':", html)
 
+    def test_wechat_html_places_body_images_after_matching_sections(self):
+        html = app._markdown_to_wechat_html(
+            "# 标题\n\n"
+            "开头摘要，说明整体背景。\n\n"
+            "供应商异常会导致退税申报进入函调流程，企业要提前核验资质。\n\n"
+            "资金周转会受到影响，财务团队需要准备现金流预案。\n\n"
+            "合同、发票、物流和付款记录需要保持一致。",
+            images={
+                "0": {
+                    "url": "/api/generated-image?file=supplier.png",
+                    "section_excerpt": "供应商异常会导致退税申报进入函调流程",
+                },
+                "1": {
+                    "url": "/api/generated-image?file=cashflow.png",
+                    "section_excerpt": "资金周转会受到影响，财务团队需要准备现金流预案",
+                },
+            },
+        )
+
+        supplier_text_pos = html.index("供应商异常会导致退税申报进入函调流程")
+        supplier_img_pos = html.index("supplier.png")
+        cashflow_text_pos = html.index("资金周转会受到影响")
+        cashflow_img_pos = html.index("cashflow.png")
+        records_text_pos = html.index("合同、发票、物流")
+
+        self.assertGreater(supplier_img_pos, supplier_text_pos)
+        self.assertLess(supplier_img_pos, cashflow_text_pos)
+        self.assertGreater(cashflow_img_pos, cashflow_text_pos)
+        self.assertLess(cashflow_img_pos, records_text_pos)
+
     def test_export_docx_accepts_local_output_image_url(self):
         client = app.app.test_client()
         image_dir = app.OUTPUT_DIR / "images"

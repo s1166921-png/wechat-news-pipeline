@@ -540,10 +540,13 @@
     imageSlots.forEach(function(slot, pos) {
       var isFirst = pos === 0;
       var isLast = pos === imageSlots.length - 1;
-      var badgeText = slot.type === 'cover' ? '封面' : '位置 ' + (pos + 1);
+      var badgeText = slot.type === 'cover' ? '封面' : '对应正文';
+      var excerptText = slot.type === 'body' && slot.section_excerpt
+        ? '<span class="image-position-excerpt">对应：' + escHtml(slot.section_excerpt.substring(0, 56)) + (slot.section_excerpt.length > 56 ? '...' : '') + '</span>'
+        : '';
       html += '<div class="image-position-row" data-pos="' + pos + '">' +
         '<img class="image-position-thumb" src="' + slot.url + '" alt="">' +
-        '<span class="image-position-label">' + escHtml(slot.label) + '</span>' +
+        '<span class="image-position-main"><span class="image-position-label">' + escHtml(slot.label) + '</span>' + excerptText + '</span>' +
         '<span class="image-position-badge">' + badgeText + '</span>' +
         '<div class="image-position-actions">' +
           '<button class="btn-img-pos btn-img-up" data-pos="' + pos + '" title="上移" ' + (isFirst ? 'disabled' : '') + '>▲</button>' +

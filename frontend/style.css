@@ -515,7 +515,14 @@ body {
   width: 48px; height: 36px; border-radius: 3px;
   object-fit: cover; border: 1px solid var(--border); flex-shrink: 0;
 }
-.image-position-label { flex: 1; font-weight: 500; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-position-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+.image-position-label { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-position-excerpt {
+  color: var(--text-secondary); font-size: 11px; line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .image-position-badge {
   font-size: 11px; padding: 1px 6px; border-radius: 10px;
   background: var(--brand-red-light); color: var(--brand-red);
