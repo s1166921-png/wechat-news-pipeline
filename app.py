@@ -4495,12 +4495,14 @@ def _build_docx(content, title, images):
     class _Block:
         """A parsed content block that can write itself to the doc."""
         def __init__(self, block_type, text, data=None):
-            self.block_type = block_type  # "h2"|"h3"|"table"|"ol"|"ul"|"para"|"hr"
+            self.block_type = block_type  # "h1"|"h2"|"h3"|"table"|"ol"|"ul"|"para"|"hr"
             self.text = text             # plain text for matching
             self.data = data or {}       # extra rendering data
 
         def write(self, doc_obj):
-            if self.block_type == "h2":
+            if self.block_type == "h1":
+                doc_obj.add_heading(self.text, level=1)
+            elif self.block_type == "h2":
                 doc_obj.add_heading(self.text, level=2)
             elif self.block_type == "h3":
                 doc_obj.add_heading(self.text, level=3)
@@ -4541,6 +4543,12 @@ def _build_docx(content, title, images):
         # 分隔线
         if line.strip() in ("---", "***", "___"):
             blocks.append(_Block("hr", ""))
+            i += 1
+            continue
+
+        # H1/H2/H3
+        if line.startswith("# ") or line.startswith("#\t"):
+            blocks.append(_Block("h1", line[2:].strip()))
             i += 1
             continue
 
@@ -4603,6 +4611,11 @@ def _build_docx(content, title, images):
             i += 1
         if para_parts:
             blocks.append(_Block("para", " ".join(para_parts)))
+            continue
+
+        # Unknown non-empty Markdown syntax: preserve as plain paragraph and move on.
+        blocks.append(_Block("para", line.strip().lstrip("#").strip()))
+        i += 1
 
     # ── 为每张图片找到最佳匹配 block ──
     def _text_similarity(excerpt, block_text):

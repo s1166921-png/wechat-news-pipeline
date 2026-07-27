@@ -1,4 +1,6 @@
 import unittest
+import subprocess
+import sys
 from zipfile import ZipFile
 from base64 import b64decode
 from io import BytesIO
@@ -342,6 +344,25 @@ class ImageEmbeddingTests(unittest.TestCase):
                 if name.startswith("word/media/")
             ]
         self.assertGreaterEqual(len(media_files), 1)
+
+    def test_export_docx_does_not_hang_on_h1_heading(self):
+        script = """
+import app
+client = app.app.test_client()
+response = client.post('/api/export-docx', json={
+    'title': 'H1 hang test',
+    'content': '# 文章标题\\n\\n正文内容',
+    'images': {},
+})
+raise SystemExit(0 if response.status_code == 200 else 1)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=str(app.BASE_DIR),
+            timeout=8,
+        )
+
+        self.assertEqual(result.returncode, 0)
 
 
 class FetchArticleEndpointTests(unittest.TestCase):
