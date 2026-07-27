@@ -1254,10 +1254,14 @@
       var factGuardNote = "";
       var remainingFactWarnings = d.fact_warnings || [];
       var initialFactWarnings = d.fact_warnings_initial || [];
-      if (remainingFactWarnings.length) {
-        factGuardNote = " · 存在 " + remainingFactWarnings.length + " 个事实需人工复核";
+      var remainingSoftWarnings = d.soft_claim_warnings || [];
+      var initialSoftWarnings = d.soft_claim_warnings_initial || [];
+      var remainingGuardCount = remainingFactWarnings.length + remainingSoftWarnings.length;
+      var initialGuardCount = initialFactWarnings.length + initialSoftWarnings.length;
+      if (remainingGuardCount) {
+        factGuardNote = " · 存在 " + remainingGuardCount + " 个事实/判断需人工复核";
       } else if (d.fact_guard_retry_count > 0) {
-        factGuardNote = " · 已校验并移除 " + initialFactWarnings.length + " 个未支持事实";
+        factGuardNote = " · 已校验并移除 " + initialGuardCount + " 个未支持事实/判断";
       }
 
       // Switch to preview

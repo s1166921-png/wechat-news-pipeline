@@ -24,6 +24,28 @@ FACT_PATTERNS = [
     r"\d+(?:\.\d+)?(?:万|亿)?(?:单|票|家|个|件|人|SKU|sku)",
 ]
 
+SOFT_CLAIM_PATTERNS = [
+    "近期发布",
+    "最新发布",
+    "正式发布",
+    "落地实施",
+    "释放出明确信号",
+    "明确信号",
+    "底层逻辑",
+    "本质上是",
+    "意味着",
+    "直接冲击",
+    "直接影响",
+    "监管升级",
+    "审核收紧",
+    "政策收紧",
+    "全面收紧",
+    "显著提升",
+    "明显增加",
+    "核心原因",
+    "主要原因",
+]
+
 
 def normalize_fact_token(token):
     token = (token or "").strip()
@@ -62,4 +84,31 @@ def find_unsupported_fact_tokens(output_text, source_text):
     for token in extract_fact_tokens(output_text):
         if token not in source_tokens:
             unsupported.append(token)
+    return unsupported
+
+
+def extract_soft_claims(text):
+    """Extract interpretation-heavy claims that should be grounded by source wording."""
+    text = text or ""
+    claims = []
+    seen = set()
+    for sentence in re.split(r"(?<=[。！？!?；;])\s*|\n+", text):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        for marker in SOFT_CLAIM_PATTERNS:
+            if marker in sentence and marker not in seen:
+                seen.add(marker)
+                claims.append({"marker": marker, "sentence": sentence[:160]})
+    return claims
+
+
+def find_unsupported_soft_claims(output_text, source_text):
+    """Return soft interpretation markers absent from the source text."""
+    source_text = source_text or ""
+    unsupported = []
+    for claim in extract_soft_claims(output_text):
+        marker = claim["marker"]
+        if marker not in source_text:
+            unsupported.append(f"{marker}: {claim['sentence']}")
     return unsupported

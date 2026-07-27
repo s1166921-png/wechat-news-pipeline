@@ -4184,7 +4184,8 @@ def api_rewrite_article():
 1. 不得逐句改写，不要沿用原文段落顺序、标题层级和句式节奏
 2. 可以重排信息顺序、重写开头、合并重复段落、改写小标题
 3. 事实、日期、金额、比例、政策编号必须仍然只来自原文和硬事实清单
-4. 表达要像重新采写的一篇新稿，但不能新增原文没有的结论、案例或数据"""
+4. 表达要像重新采写的一篇新稿，但不能新增原文没有的结论、案例或数据
+5. 不要写“近期发布、明确信号、底层逻辑、直接冲击、监管升级”等原文没有明确支撑的判断"""
 
     rewrite_user_prompt = f"""请根据你的写作风格和结构公式，重写以下文章。
 
@@ -4227,19 +4228,27 @@ def api_rewrite_article():
         return jsonify({"error": "AI 改写失败，请重试"}), 500
 
     fact_warnings_initial = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
+    soft_claim_warnings_initial = _core_facts.find_unsupported_soft_claims(rewritten_md, source_content)
     fact_warnings = fact_warnings_initial
+    soft_claim_warnings = soft_claim_warnings_initial
     fact_guard_retry_count = 0
-    if fact_warnings_initial:
+    if fact_warnings_initial or soft_claim_warnings_initial:
+        unsupported_blocks = []
+        if fact_warnings_initial:
+            unsupported_blocks.append("未支持硬事实：" + ", ".join(fact_warnings_initial))
+        if soft_claim_warnings_initial:
+            unsupported_blocks.append("未支持判断：" + "；".join(soft_claim_warnings_initial))
         retry_prompt = f"""你刚才的改写中出现了原文没有支持的硬事实，请重新输出完整文章。
 
-必须删除或改成非具体表达的未支持事实：
-{", ".join(fact_warnings_initial)}
+必须删除或改成原文可支撑的保守表达：
+{chr(10).join(unsupported_blocks)}
 
 硬性规则：
 1. 不得出现上面这些未支持事实
 2. 不得新增任何原文没有的日期、金额、比例、政策编号、案例或平台动作
-3. 保留原文中真实存在的事实，例如：{fact_token_block}
-4. 直接输出修正后的完整 Markdown 文章
+3. 不得新增原文没有支撑的判断，例如“近期发布、明确信号、底层逻辑、直接冲击、监管升级”
+4. 保留原文中真实存在的事实，例如：{fact_token_block}
+5. 直接输出修正后的完整 Markdown 文章
 
 === 原文内容 ===
 {source_content}
@@ -4256,8 +4265,9 @@ def api_rewrite_article():
             rewritten_md = corrected_md
             fact_guard_retry_count = 1
             fact_warnings = _core_facts.find_unsupported_fact_tokens(rewritten_md, source_content)
-            if fact_warnings:
-                print(f"  [FactGuard] unsupported facts remain after retry: {fact_warnings[:8]}")
+            soft_claim_warnings = _core_facts.find_unsupported_soft_claims(rewritten_md, source_content)
+            if fact_warnings or soft_claim_warnings:
+                print(f"  [FactGuard] unsupported items remain after retry: facts={fact_warnings[:8]}, soft={soft_claim_warnings[:8]}")
 
     # ── Convert to WeChat HTML ──
     rewritten_html = _markdown_to_wechat_html(
@@ -4286,6 +4296,8 @@ def api_rewrite_article():
         "source_fact_tokens": source_fact_tokens,
         "fact_warnings": fact_warnings,
         "fact_warnings_initial": fact_warnings_initial,
+        "soft_claim_warnings": soft_claim_warnings,
+        "soft_claim_warnings_initial": soft_claim_warnings_initial,
         "fact_guard_retry_count": fact_guard_retry_count,
         "import_mode": import_info["mode"],
         "import_recommendation": import_info["recommendation"],

@@ -2,7 +2,9 @@ import unittest
 
 from pipeline_core.facts import (
     extract_fact_tokens,
+    extract_soft_claims,
     find_unsupported_fact_tokens,
+    find_unsupported_soft_claims,
 )
 
 
@@ -37,3 +39,22 @@ class FactTokenTests(unittest.TestCase):
         unsupported = find_unsupported_fact_tokens(output, source)
 
         self.assertIn("37%", unsupported)
+
+    def test_find_unsupported_soft_claims_flags_unbacked_recent_and_causal_claims(self):
+        source = "原文提到退税周期可能延长到3-6个月，企业需要关注供应商合规。"
+        output = "税务部门近期发布的说明释放出明确信号，退税周期延长的底层逻辑是监管升级，直接冲击卖家现金流。"
+
+        unsupported = find_unsupported_soft_claims(output, source)
+
+        self.assertTrue(any("近期发布" in item for item in unsupported))
+        self.assertTrue(any("明确信号" in item for item in unsupported))
+        self.assertTrue(any("底层逻辑" in item for item in unsupported))
+        self.assertTrue(any("直接冲击" in item for item in unsupported))
+
+    def test_find_unsupported_soft_claims_allows_claims_visible_in_source(self):
+        source = "原文明确提到：这释放出明确信号，供应商异常会直接冲击现金流。"
+        output = "这释放出明确信号，供应商异常会直接冲击现金流。"
+
+        unsupported = find_unsupported_soft_claims(output, source)
+
+        self.assertEqual([], unsupported)

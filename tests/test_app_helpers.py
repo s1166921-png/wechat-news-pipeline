@@ -222,6 +222,33 @@ class RewriteEndpointTests(unittest.TestCase):
         self.assertNotIn("2026年7月15日", data["rewritten_markdown"])
         self.assertNotIn("37%", data["rewritten_markdown"])
 
+    def test_rewrite_retries_when_generated_text_has_unsupported_soft_claims(self):
+        client = app.app.test_client()
+        calls = []
+
+        def fake_llm(**kwargs):
+            calls.append(kwargs["user"])
+            if len(calls) == 1:
+                return "# 标题\n\n税务部门近期发布的说明释放出明确信号，退税周期延长的底层逻辑是监管升级，直接冲击卖家现金流。"
+            return "# 标题\n\n原文提到退税周期可能延长到3-6个月，企业需要关注供应商合规。"
+
+        with patch("app.llm_chat_text", side_effect=fake_llm):
+            response = client.post("/api/rewrite", json={
+                "raw_content": "原文提到退税周期可能延长到3-6个月，企业需要关注供应商合规。" * 30,
+                "style": "b2b",
+                "rewrite_mode": "recompose",
+                "temperature": 0.9,
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["fact_guard_retry_count"], 1)
+        self.assertTrue(any("近期发布" in item for item in data["soft_claim_warnings_initial"]))
+        self.assertTrue(any("底层逻辑" in item for item in data["soft_claim_warnings_initial"]))
+        self.assertEqual([], data["soft_claim_warnings"])
+        self.assertIn("未支持判断", calls[1])
+        self.assertNotIn("近期发布", data["rewritten_markdown"])
+
     def test_rewrite_recompose_mode_uses_higher_temperature_and_restructure_prompt(self):
         client = app.app.test_client()
         captured = {}
