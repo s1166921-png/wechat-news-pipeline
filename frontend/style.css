@@ -491,6 +491,11 @@ body {
 .phone-article-body hr { border: none; border-top: 1px solid #e8e8e8; margin: 16px 0; }
 .phone-article-body img { max-width: 100%; border-radius: 4px; margin: 8px 0; }
 .phone-article-body a { text-decoration: none; border-bottom-width: 1px; border-bottom-style: solid; }
+.preview-error {
+  padding: 10px 12px; margin: 0 0 14px;
+  border: 1px solid #fecaca; border-radius: var(--radius-sm);
+  background: #fef2f2; color: #991b1b; font-size: 13px;
+}
 .phone-article-footer { display: flex; justify-content: space-around; padding: 16px; border-top: 1px solid #f0f0f0; font-size: 13px; color: #999; }
 
 /* ── Image Position Editor (below phone frame) ── */

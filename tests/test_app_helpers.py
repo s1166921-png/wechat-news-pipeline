@@ -97,6 +97,20 @@ class FlaskSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["status"], "ok")
 
+    def test_large_api_payload_returns_json_413(self):
+        client = app.app.test_client()
+        old_limit = app.app.config.get("MAX_CONTENT_LENGTH")
+        app.app.config["MAX_CONTENT_LENGTH"] = 1024
+        try:
+            response = client.post("/api/to-wechat-html", json={
+                "content": "过大的正文" * 500,
+            })
+        finally:
+            app.app.config["MAX_CONTENT_LENGTH"] = old_limit
+
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("请求内容过大", response.get_json()["error"])
+
 
 class ImageGenerationTests(unittest.TestCase):
     def test_select_image_sections_returns_requested_count_from_short_blocks(self):

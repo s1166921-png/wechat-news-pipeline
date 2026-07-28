@@ -383,6 +383,8 @@
 
     try {
       console.log("[renderWechatPreview] Sending: fs=" + wechatState.fontSize + " accent=" + wechatState.accentColor + " theme=" + wechatState.theme);
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function () { controller.abort(); }, 30000);
       var r = await fetch("/api/to-wechat-html", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -394,9 +396,14 @@
           accent_color: wechatState.accentColor,
           images: imageMap || undefined,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       console.log("[renderWechatPreview] Response status:", r.status);
       var d = await r.json();
+      if (!r.ok || d.error) {
+        throw new Error(d.error || "微信预览生成失败");
+      }
       console.log("[renderWechatPreview] Got HTML length:", d.html ? d.html.length : 0, "font_size:", d.font_size);
       if (d.html) {
         wechatState.cachedHtml = d.html;
@@ -408,7 +415,10 @@
       }
     } catch (e) {
       console.error("[renderWechatPreview] Failed:", e);
-      if (bodyEl) bodyEl.innerHTML = marked.parse(state.articleContent);
+      var errMsg = e.name === "AbortError" ? "微信预览生成超时，请稍后重试" : e.message;
+      if (bodyEl) {
+        bodyEl.innerHTML = '<div class="preview-error">⚠️ ' + escHtml(errMsg) + '</div>' + marked.parse(state.articleContent);
+      }
     }
 
     if (options.refreshPositions !== false) {

@@ -43,6 +43,7 @@ MIN_RAW_REWRITE_CHARS = 300
 
 # ── Flask App ─────────────────────────────────────────
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_API_BODY_BYTES", 3 * 1024 * 1024))
 
 # —— Debug: 记录所有 API 请求的原始 body ——
 import logging
@@ -79,6 +80,14 @@ def _log_request():
 def _bad_request(e):
     """返回 JSON 而非 HTML，避免前端 JSON.parse 崩溃"""
     return jsonify({"error": "Bad Request: 请求格式错误，请刷新页面后重试", "detail": str(e)}), 400
+
+@app.errorhandler(413)
+def _request_too_large(e):
+    logging.warning(f"413 on {request.path}: content_length={request.content_length}")
+    return jsonify({
+        "error": "请求内容过大，请减少粘贴正文长度或先导出当前文章后刷新页面重试",
+        "max_bytes": app.config.get("MAX_CONTENT_LENGTH"),
+    }), 413
 
 @app.errorhandler(500)
 def _server_error(e):
