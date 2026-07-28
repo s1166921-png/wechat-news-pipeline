@@ -131,6 +131,23 @@ class ImageGenerationTests(unittest.TestCase):
         self.assertTrue(all(section.strip() for section in sections))
         self.assertEqual(len(set(sections)), 3)
 
+    def test_select_image_sections_samples_across_article(self):
+        content = "\n\n".join([
+            "第一部分：开头背景说明，介绍为什么这件事值得关注，避免只看标题。",
+            "第二部分：政策或事件本身的核心信息，说明主要变化和直接对象。",
+            "第三部分：企业经营影响，讨论成本、流程、审核和组织协同。",
+            "第四部分：风险拆解，分别说明供应商、资金流和单证资料的问题。",
+            "第五部分：行动建议，给出检查清单、负责人和时间安排。",
+            "第六部分：结尾复盘，提示后续跟踪事项和下一步观察重点。",
+        ])
+
+        sections = app._select_image_sections(content, count=3)
+
+        self.assertEqual(len(sections), 3)
+        self.assertTrue("第一部分" in sections[0] or "第二部分" in sections[0])
+        self.assertTrue("第三部分" in sections[1] or "第四部分" in sections[1])
+        self.assertIn("第五部分", sections[2])
+
     def test_generate_image_keeps_failed_slot_visible(self):
         client = app.app.test_client()
         article = "\n\n".join([
@@ -574,6 +591,26 @@ class ImageEmbeddingTests(unittest.TestCase):
         self.assertLess(supplier_img_pos, cashflow_text_pos)
         self.assertGreater(cashflow_img_pos, cashflow_text_pos)
         self.assertLess(cashflow_img_pos, records_text_pos)
+
+    def test_wechat_html_fallback_distributes_unmatched_body_images(self):
+        html = app._markdown_to_wechat_html(
+            "# 标题\n\n"
+            "第一段：开头背景。\n\n"
+            "第二段：基础信息。\n\n"
+            "第三段：业务影响。\n\n"
+            "第四段：风险拆解。\n\n"
+            "第五段：行动建议。\n\n"
+            "第六段：结尾复盘。",
+            images={
+                "0": "/api/generated-image?file=body-a.png",
+                "1": "/api/generated-image?file=body-b.png",
+                "2": "/api/generated-image?file=body-c.png",
+            },
+        )
+
+        self.assertGreater(html.index("body-a.png"), html.index("第二段"))
+        self.assertGreater(html.index("body-b.png"), html.index("第三段"))
+        self.assertGreater(html.index("body-c.png"), html.index("第五段"))
 
     def test_export_docx_accepts_local_output_image_url(self):
         client = app.app.test_client()

@@ -2440,9 +2440,11 @@ def _select_image_sections(article_content, count=3, min_chars=50):
     """Pick enough article sections for body image prompts.
 
     Markdown articles can contain many short headings, bullets, and table rows.
-    A strict paragraph-only split may return fewer sections than requested,
-    leaving visible image slots empty. We merge adjacent short blocks and fall
-    back to rolling windows so each requested slot gets a prompt candidate.
+    A strict first-N paragraph split makes all generated images attach near the
+    top of the article. We first build usable content blocks, then sample them
+    across the article so 3 body images naturally cover early, middle, and late
+    sections. Short articles still get fallback windows so every slot has a
+    prompt candidate.
     """
     import re as _re
 
@@ -2459,25 +2461,58 @@ def _select_image_sections(article_content, count=3, min_chars=50):
     if not raw_blocks:
         raw_blocks = [_re.sub(r"\s+", " ", text)]
 
-    sections = []
-    buffer = ""
-    for block in raw_blocks:
+    def _clean_block(block):
         cleaned = _re.sub(r"^#{1,6}\s*", "", block).strip()
         cleaned = _re.sub(r"^\|[\s\-:|]+\|$", "", cleaned).strip()
+        cleaned = _re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
+
+    def _pick_distributed(items, target_count):
+        if not items:
+            return []
+        if len(items) <= target_count:
+            return list(items)
+        picked = []
+        used = set()
+        for i in range(target_count):
+            ratio = (i + 1) / (target_count + 1)
+            idx = round(ratio * (len(items) - 1))
+            while idx in used and idx < len(items) - 1:
+                idx += 1
+            while idx in used and idx > 0:
+                idx -= 1
+            used.add(idx)
+            picked.append(items[idx])
+        return picked
+
+    clean_blocks = [
+        cleaned
+        for cleaned in (_clean_block(block) for block in raw_blocks)
+        if len(cleaned) >= 12
+    ]
+    if len(clean_blocks) >= target:
+        return _pick_distributed(clean_blocks, target)[:target]
+
+    candidates = list(clean_blocks)
+    buffer = ""
+    for block in raw_blocks:
+        cleaned = _clean_block(block)
         if not cleaned:
             continue
         buffer = (buffer + "\n" + cleaned).strip() if buffer else cleaned
         if len(buffer) >= min_chars:
-            sections.append(buffer)
+            if buffer not in candidates:
+                candidates.append(buffer)
             buffer = ""
-        if len(sections) >= target:
-            break
 
-    if buffer and len(sections) < target:
-        sections.append(buffer)
+    if buffer and buffer not in candidates:
+        candidates.append(buffer)
+
+    if len(candidates) >= target:
+        return _pick_distributed(candidates, target)[:target]
 
     flat_text = _re.sub(r"\s+", " ", text)
-    existing = set(sections)
+    existing = set(candidates)
     sentence_parts = [
         part.strip()
         for part in _re.split(r"(?<=[。！？!?])", flat_text)
@@ -2488,14 +2523,15 @@ def _select_image_sections(article_content, count=3, min_chars=50):
         sentence_buffer = (sentence_buffer + part).strip()
         if len(sentence_buffer) >= 32:
             if sentence_buffer not in existing:
-                sections.append(sentence_buffer)
+                candidates.append(sentence_buffer)
                 existing.add(sentence_buffer)
             sentence_buffer = ""
-        if len(sections) >= target:
-            break
-    if sentence_buffer and len(sections) < target and sentence_buffer not in existing:
-        sections.append(sentence_buffer)
+    if sentence_buffer and sentence_buffer not in existing:
+        candidates.append(sentence_buffer)
         existing.add(sentence_buffer)
+
+    sections = _pick_distributed(candidates, target)
+    existing = set(sections)
 
     cursor = 0
     while len(sections) < target and flat_text:
@@ -3727,6 +3763,7 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
             {
                 "start": m.start(),
                 "end": m.end(),
+                "tag": (m.groupdict().get("tag") or "hr").lower(),
                 "text": _strip_html(m.group(0)),
             }
             for m in block_pattern.finditer(body_html)
@@ -3750,7 +3787,6 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
                 order += 1
 
             body_items = [item for item in image_items if item[0] != "cover"]
-            fallback_cursor = 1 if len(blocks) > 1 else 0
             for idx, (_, _, img_url, excerpt) in enumerate(body_items):
                 best_idx = None
                 best_score = 0.0
@@ -3764,10 +3800,18 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
                             best_idx = block_idx
 
                 if best_idx is None or best_score < 0.08:
-                    while fallback_cursor in used_block_indexes and fallback_cursor < len(blocks) - 1:
-                        fallback_cursor += 1
-                    best_idx = min(fallback_cursor, len(blocks) - 1)
-                    fallback_cursor += 1
+                    fallback_indexes = [
+                        block_idx
+                        for block_idx, block in enumerate(blocks)
+                        if not block["tag"].startswith("h") and block["tag"] != "hr"
+                    ] or list(range(len(blocks)))
+                    ratio = (idx + 1) / (len(body_items) + 1)
+                    fallback_pos = math.ceil(ratio * (len(fallback_indexes) - 1))
+                    best_idx = fallback_indexes[max(0, min(fallback_pos, len(fallback_indexes) - 1))]
+                    while best_idx in used_block_indexes and best_idx < len(blocks) - 1:
+                        best_idx += 1
+                    while best_idx in used_block_indexes and best_idx > 0:
+                        best_idx -= 1
 
                 used_block_indexes.add(best_idx)
                 img_html = (
