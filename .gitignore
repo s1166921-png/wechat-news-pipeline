@@ -23,3 +23,8 @@ test_results.json
 # IDE
 .vscode/
 .idea/
+
+# Portable build artifacts
+build/
+dist/
+*.spec

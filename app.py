@@ -4,7 +4,7 @@ app.py — 跨境电商热点内容创作工坊 (Flask Server)
 
 3 步向导：发现热点 → 生成文章 → 配图导出
 """
-import json, math, os, re, time, hashlib, ssl
+import json, math, os, re, sys, time, hashlib, ssl
 import urllib.request, urllib.error
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -22,7 +22,14 @@ from pipeline_core import originality as _core_originality
 from pipeline_core import quality as _core_quality
 
 # ── 路径常量 ──────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent
+def _runtime_base_dir():
+    """Return the folder that owns config/frontend/output at runtime."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+BASE_DIR = _runtime_base_dir()
 CONFIG_DIR = BASE_DIR / "config"
 OUTPUT_DIR = BASE_DIR / "output"
 FRONTEND_DIR = BASE_DIR / "frontend"
