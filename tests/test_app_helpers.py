@@ -685,6 +685,28 @@ class SearchFreshnessRankingTests(unittest.TestCase):
         self.assertIn("海外仓 最新", query_texts)
         self.assertIn("海外仓 动态", query_texts)
         self.assertIn("海外仓 2026", query_texts)
+
+    def test_quality_filter_removes_baidu_seo_aggregation_pages(self):
+        results = [
+            {
+                "title": "海外仓趋势 _海外网红营销_跨境电商出口海外仓-雨果跨境",
+                "url": "https://www.cifnews.com/tags/1",
+                "source": "雨果跨境",
+                "source_type": "baidu",
+                "snippet": "海外仓 趋势",
+            },
+            {
+                "title": "利好本土店！美客多拉美四国海外仓本土卖家服务全面开放",
+                "url": "https://www.ebrun.com/20260801.html",
+                "source": "亿邦动力",
+                "source_type": "ebrun",
+                "snippet": "海外仓 服务开放",
+            },
+        ]
+
+        filtered = app._filter_quality_results(results, keyword="海外仓 趋势")
+
+        self.assertEqual([r["title"] for r in filtered], [results[1]["title"]])
     def test_tax_delay_keyword_expands_to_business_queries(self):
         queries = app._build_search_queries("出口退税慢")
         query_texts = [q for q, _ in queries]

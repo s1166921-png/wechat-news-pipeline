@@ -1927,8 +1927,21 @@ def _has_keyword_relevance(item, keyword):
 
 def _filter_quality_results(results, keyword="", profile_context=None):
     """Filter out low-quality results: baike/zhidao/wiki/pure-definition pages, broken links."""
+    seo_title_patterns = (
+        "最新相关信息", "的最新相关信息", "相关搜索", "搜索结果",
+        "海外网红营销_跨境电商出口海外仓",
+    )
+    cleaned = []
+    for item in results:
+        title = item.get("title", "")
+        source_type = item.get("source_type", "")
+        if any(p in title for p in seo_title_patterns):
+            continue
+        if source_type == "baidu" and "_" in title and "：" not in title and ":" not in title:
+            continue
+        cleaned.append(item)
     return _core_quality.filter_quality_results(
-        results,
+        cleaned,
         keyword=keyword,
         low_quality_domains=_LOW_QUALITY_DOMAINS,
         industry_sources=_INDUSTRY_SOURCES,
