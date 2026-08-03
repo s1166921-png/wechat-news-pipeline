@@ -207,7 +207,8 @@ class ImageGenerationTests(unittest.TestCase):
         self.assertEqual(data["images"][0]["retry_used"], True)
         self.assertEqual(data["images"][0]["section_excerpt"], "这是第一段正文对应内容")
         self.assertEqual(data["images"][0]["index"], 0)
-        self.assertIn("企业合规流程信息图", data["images"][0]["prompt"])
+        self.assertIn("企业合规流程场景插画", data["images"][0]["prompt"])
+        self.assertIn("无文字无数字", data["images"][0]["prompt"])
 
     def test_custom_prompt_string_remains_backward_compatible(self):
         client = app.app.test_client()
@@ -223,6 +224,77 @@ class ImageGenerationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data["images"][0]["status"], "ok")
         self.assertEqual(data["images"][0]["section_excerpt"], "自定义配图 Prompt")
+
+
+class GenerateArticleFactGuardTests(unittest.TestCase):
+    def test_generate_article_removes_unsupported_fact_tokens(self):
+        client = app.app.test_client()
+        generated = (
+            "# 标题\n\n"
+            "2026年8月1日，美客多面向墨西哥、巴西、智利、阿根廷四国开放海外仓本土卖家服务。\n\n"
+            "据行业估算，申诉周期可从7-15个工作日压缩到3-5个工作日，合规成本约占8%-12%。\n\n"
+            "卖家需要关注账号健康度和库存绩效。"
+        )
+
+        with patch("app._fetch_general_article", return_value=("", "https://example.com/news")), \
+             patch("app.llm_chat_text", return_value=generated):
+            response = client.post("/api/generate-article", json={
+                "news_item": {
+                    "title": "美客多四国海外仓服务开放",
+                    "url": "https://example.com/news",
+                    "source": "亿邦动力",
+                    "date": "2026-08-01",
+                    "snippet": "美客多宣布自2026年8月1日起，面向墨西哥、巴西、智利、阿根廷四国开放海外仓本土卖家服务。",
+                },
+                "style": "b2b",
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("2026年8月1日", data["content"])
+        self.assertNotIn("7-15个工作日", data["content"])
+        self.assertNotIn("3-5个工作日", data["content"])
+        self.assertNotIn("8%-12%", data["content"])
+        self.assertTrue(data["fact_guard_applied"])
+        self.assertIn("3-5个工作日", data["fact_warnings_initial"])
+        self.assertIn("8%-12%", data["fact_warnings_initial"])
+
+    def test_article_prompt_bans_industry_estimate_fillers(self):
+        prompt = app._build_article_prompt({
+            "title": "测试新闻",
+            "snippet": "原文只提到平台开放新服务。",
+            "source": "测试来源",
+        }, style="b2b")
+
+        self.assertIn("不要使用\"据行业估算\"", prompt)
+        self.assertIn("不要为了满足标题、开头、表格或数据密度要求而新增来源中没有的数字", prompt)
+
+    def test_fact_guard_does_not_trust_ai_topic_suggestions(self):
+        source = app._build_fact_guard_source({
+            "title": "美客多海外仓服务开放",
+            "snippet": "原文只提到美客多开放海外仓服务。",
+            "suggested_topic": "48小时送达背后的海外仓机会",
+            "article_summary": "AI摘要声称48小时送达。",
+        })
+        output = "# 标题\n\n美客多海外仓48小时送达带来新机会。"
+
+        warnings = app._core_facts.find_unsupported_fact_tokens(output, source)
+
+        self.assertIn("48小时", warnings)
+
+
+class WechatHtmlTemplateTests(unittest.TestCase):
+    def test_part_heading_uses_fixed_wechat_template(self):
+        html = app._markdown_to_wechat_html(
+            "# 标题\n\n## PART 1 — 2R是什么\n\n正文内容",
+            title="标题",
+            accent_color="#ff8a45",
+        )
+
+        self.assertIn("PART 1", html)
+        self.assertIn("2R是什么", html)
+        self.assertIn("linear-gradient", html)
+        self.assertIn("max-width:320px", html)
 
 
 class RewriteEndpointTests(unittest.TestCase):

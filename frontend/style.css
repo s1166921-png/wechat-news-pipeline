@@ -334,6 +334,26 @@ body {
   background: var(--card); border-radius: var(--radius);
   box-shadow: var(--shadow); overflow: hidden;
 }
+.publish-center {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 14px 16px;
+  background: #fff8ec; border-bottom: 1px solid #f1dfba;
+}
+.publish-center strong {
+  display: block; font-size: 15px; color: #8a3b10;
+}
+.publish-center p {
+  margin: 4px 0 0; font-size: 13px; line-height: 1.5;
+  color: var(--text-secondary);
+}
+.publish-status {
+  padding: 0 16px 8px; min-height: 22px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.publish-status.success { color: #16803a; }
+.publish-status.error { color: var(--brand-red); }
+.publish-status.warn { color: #9a5b00; }
+.publish-status.loading { color: #31559c; }
 .export-buttons { display: flex; gap: 10px; padding: 16px; flex-wrap: wrap; }
 .export-status { padding: 0 16px 14px; font-size: 13px; min-height: 20px; }
 .wechat-export-layout {
@@ -354,6 +374,8 @@ body {
 @media (max-width: 900px) {
   .wechat-export-layout { grid-template-columns: 1fr; }
   .export-phone-wrapper { max-height: 620px; }
+  .publish-center { align-items: stretch; flex-direction: column; }
+  .publish-center .btn { width: 100%; }
 }
 
 /* ── Auto Pipeline ──────────────────────── */

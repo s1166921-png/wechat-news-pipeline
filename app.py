@@ -2136,7 +2136,8 @@ def _build_article_prompt(news_item, style="b2b", custom_angle="", article_conte
 
 - ⚠️ 今天是 {today_str}。文中所有日期、时间线必须以原始新闻的发布时间为基准。
 - ⚠️ **铁律**：文章中出现的所有数据、金额、百分比、政策编号、公司名称、日期、事件经过，**必须且只能**来自上面「原始文章正文」中明确提到的信息。禁止编造正文中没有的数字或事实。
-- ⚠️ 如果正文中没有提到具体数字，用行业公认的合理区间替代，并标注"据行业估算"或"参考行业平均水平"。
+- ⚠️ 如果正文中没有提到具体数字，宁可写定性判断，也不要使用"据行业估算"、"参考行业平均水平"或任何自造区间。
+- ⚠️ 风格要求必须服从事实约束。不要为了满足标题、开头、表格或数据密度要求而新增来源中没有的数字。
 - ⚠️ 不要直接复制粘贴原文。你要基于原文事实进行重构、解读、延伸分析。
 
 ## 任务
@@ -2156,7 +2157,8 @@ def _build_article_prompt(news_item, style="b2b", custom_angle="", article_conte
 
 - ⚠️ 今天是 {today_str}。文中所有日期、时间线必须以原始新闻的发布时间为基准。
 - ⚠️ 所有数据、金额、百分比必须来自上面「新闻摘要」中的真实信息。没有出现在摘要里的数字一律不得编造。
-- ⚠️ 如果原新闻没有提供具体数字，用行业公认的合理区间替代，并标注"据行业估算"。
+- ⚠️ 如果原新闻没有提供具体数字，宁可写定性判断，也不要使用"据行业估算"或任何自造区间。
+- ⚠️ 风格要求必须服从事实约束。不要为了满足标题、开头、表格或数据密度要求而新增来源中没有的数字。
 
 ## 任务
 
@@ -2174,7 +2176,7 @@ def _build_article_prompt(news_item, style="b2b", custom_angle="", article_conte
 - PART 3: 实操指南/应对建议（150-300字，"01.""02."每条一个具体行动）
 - 结尾段落: 一句话总结信号 + 对比(短期vs长期) + 金句收尾
 - 每段不超过3句话，宁可多分段
-- 每段必须有具体数字/日期/政策编号/金额
+- 只使用原文或摘要中已经出现的具体数字/日期/政策编号/金额；没有来源依据时不要硬凑数字
 - 全文至少3组对比结构
 - 只在最重要的关键词上偶尔用 `**加粗**`，全文 3-5 处即可
 - 禁止: 开头废话、超过3句的段落、模糊词、Markdown表格
@@ -2185,8 +2187,8 @@ def _build_article_prompt(news_item, style="b2b", custom_angle="", article_conte
 - 先输出 3 个候选标题（### 候选标题），每个 15-25 字，包含具体数字+痛点
 - 然后输出「---」分隔线
 - 正文 800-1200 字
-- 开头前 100 字必须包含具体数字冲击（$金额/百分比），禁止"大家好""今天聊聊"等开场
-- 每 300 字至少 1 个精确数字
+- 开头前 100 字优先使用原文已有具体数字切入；如果来源没有金额/百分比，直接用事件变化切入，禁止编造数字
+- 只使用来源中已经出现的精确数字；没有来源依据时不要为了数据密度硬凑数字
 - 必须包含: Markdown 对比表格（至少 3 方案 × 4 维度）
 - ⚠️ **加粗硬性限制**: 全文 `**加粗**` 不超过 5 处。仅限段落中的行内关键词（如单个数字或概念词）。表格、标题、列表项标题、分隔符一律禁止加粗。超过 5 处视为严重格式违规
 - 禁止: 推荐具体服务商、CTA 营销话术、品牌软文、模糊词（"很多""大幅"）
@@ -2198,8 +2200,8 @@ def _build_article_prompt(news_item, style="b2b", custom_angle="", article_conte
 - 先输出 3 个候选标题（### 候选标题），每个 12-22 字，包含具体数字+场景化痛点
 - 然后输出「---」分隔线
 - 正文 600-900 字
-- 开头前 100 字必须用具体数字+真实场景直接切入，禁止"大家好""今天分享"等开场
-- 每 300 字至少 1 个精确数字
+- 开头前 100 字优先使用来源已有具体数字+真实场景切入；如果来源没有具体数字，直接用真实事件场景切入
+- 只使用来源中已经出现的精确数字；没有来源依据时不要为了数据密度硬凑数字
 - 必须包含: 不同方案的优劣对比、不适合某方案的场景
 - ⚠️ **加粗硬性限制**: 全文 `**加粗**` 不得超过 5 处。超过 5 处视为严重格式违规。只加粗 1-2 个最惊人的金额或教训
 - 禁止: 反复推荐同一服务商、CTA 营销话术、模糊评价（"服务很好""效率很高"）
@@ -2207,6 +2209,56 @@ def _build_article_prompt(news_item, style="b2b", custom_angle="", article_conte
 
 直接输出完整文章，不要任何解释性文字。"""
     return prompt
+
+
+def _build_fact_guard_source(news_item, article_content=""):
+    """Build the source corpus used to validate generated hard facts."""
+    parts = []
+    if article_content:
+        parts.append(article_content)
+    # Only trust source-facing fields. suggested_topic/key_angle/article_summary
+    # can be AI-enriched and must not whitelist new hard facts.
+    for key in ("title", "snippet", "date", "source"):
+        value = news_item.get(key, "")
+        if value:
+            parts.append(str(value))
+    return "\n".join(parts)
+
+
+def _append_generation_fact_rules(system_prompt):
+    """Make source grounding outrank style-specific data-density instructions."""
+    rules = """
+
+## 最高优先级事实规则
+- 来源没有出现的日期、金额、百分比、周期、政策编号、数量、平台动作，不得写入正文。
+- 不得使用"据行业估算""行业平均水平""通常需要""一般为"来补数字。
+- 如果风格模板要求具体数字，但来源没有该数字，必须放弃该风格要求，改用定性表达。
+- 表格、标题、图片提示词也必须遵守同一事实规则。
+"""
+    return (system_prompt or "") + rules
+
+
+def _apply_generated_article_fact_guard(content, source_text):
+    """Remove or soften unsupported factual claims from generated articles."""
+    source_text = source_text or ""
+    if not content or not source_text:
+        return content or "", [], [], []
+
+    initial_fact_warnings = _core_facts.find_unsupported_fact_tokens(content, source_text)
+    initial_soft_warnings = _core_facts.find_unsupported_soft_claims(content, source_text)
+    guarded = content
+
+    if initial_fact_warnings:
+        guarded = _core_facts.remove_unsupported_fact_sentences(guarded, source_text)
+    if initial_soft_warnings:
+        guarded = _core_facts.neutralize_unsupported_soft_claims(guarded, source_text)
+    # One more pass catches sentence-join side effects and any table/list remnants.
+    remaining_fact_warnings = _core_facts.find_unsupported_fact_tokens(guarded, source_text)
+    if remaining_fact_warnings:
+        guarded = _core_facts.remove_unsupported_fact_sentences(guarded, source_text)
+    remaining_fact_warnings = _core_facts.find_unsupported_fact_tokens(guarded, source_text)
+
+    return guarded, initial_fact_warnings, initial_soft_warnings, remaining_fact_warnings
 
 
 def _enrich_news_with_topics(items, limit=10):
@@ -2379,14 +2431,16 @@ def _build_image_prompt(article_text, image_type="cover"):
 - 商业插图风格，简洁大气
 - 色彩以红(#CE0E19)、金(#D9A85A)、白为主
 - 文字安全区在左下2/3区域，留白给标题
+- 图片本身不要出现任何文字、数字、图表标签、品牌 Logo，标题由系统后期叠加
 - 25-50字中文描述"""
     else:
         sys_p = """你是商业插图设计专家。根据文章内容，生成一个正文配图的描述 prompt。
 要求：
 - 适合 4:3 比例
-- 信息图/数据可视化/场景插画风格
-- 包含具体的视觉元素（产品、数据、场景）
-- 15-30字中文描述"""
+- 商务场景插画/流程场景/仓储物流场景，避免信息图和数据可视化
+- 图片本身不要出现任何文字、数字、图表标签、地图地名、品牌 Logo
+- 如果需要表达数据或结论，只描述抽象视觉元素（看板、文件、仓库、路线、人物），不要写具体数值
+- 20-40字中文描述"""
 
     prompt = f"文章内容: {excerpt}\n\n请生成一个{'封面图' if image_type == 'cover' else '正文配图'}的图片描述。直接输出描述，不要解释。"
 
@@ -2397,15 +2451,15 @@ def _build_image_prompt(article_text, image_type="cover"):
 def _fallback_body_image_prompt(section_text, index=0):
     """Return a conservative prompt when the image API rejects a detailed prompt."""
     themes = [
-        "企业合规流程信息图，文件、审核节点、风险提示，红白灰商务风格，无人物无品牌",
-        "跨境业务风险管理插画，合同发票物流单证与检查清单，简洁商务信息图",
-        "资金周转与流程审核示意图，数据看板、时间轴、提示标签，现代企业风格",
-        "运营决策清单插画，团队看板、合规资料、流程箭头，干净白底商业风格",
+        "企业合规流程场景插画，文件、审核节点、风险提示，红白灰商务风格，无文字无数字无品牌",
+        "跨境业务风险管理插画，合同发票物流单证与检查清单，简洁商务场景，无文字无数字",
+        "资金周转与流程审核场景，抽象数据看板、时间轴、提示卡片，现代企业风格，无文字无数字",
+        "运营决策清单插画，团队看板、合规资料、流程箭头，干净白底商业风格，无文字无数字",
     ]
     base = themes[index % len(themes)]
     keywords = re.sub(r"[#>*`|_\-\[\]()（）【】《》:：，。！？、\s]+", " ", section_text or "").strip()
     keywords = keywords[:48]
-    return f"{base}，主题关键词：{keywords}" if keywords else base
+    return f"{base}，主题关键词：{keywords}，不要生成文字、数字、图表标签" if keywords else base
 
 
 def _generate_body_image_with_retry(prompt, section_text, index=0):
@@ -3201,9 +3255,9 @@ def api_generate_article():
         article_content, resolved_url = _fetch_general_article(resolved_url, timeout=12)
         if article_content:
             news_item["_resolved_url"] = resolved_url
-            print(f"  [Generate] ✓ Got {len(article_content)} chars of article content")
+            print(f"  [Generate] OK Got {len(article_content)} chars of article content")
         else:
-            print(f"  [Generate] ✗ Could not fetch article content, will use snippet fallback")
+            print(f"  [Generate] Could not fetch article content, will use snippet fallback")
 
     if style == "b2p":
         system_prompt = B2P_SYSTEM_PROMPT
@@ -3211,6 +3265,7 @@ def api_generate_article():
         system_prompt = B2B_SYSTEM_PROMPT
     else:
         system_prompt = B2C_SYSTEM_PROMPT
+    system_prompt = _append_generation_fact_rules(system_prompt)
 
     user_prompt = _build_article_prompt(news_item, style, custom_angle, article_content)
 
@@ -3221,6 +3276,11 @@ def api_generate_article():
     if not content:
         # Fallback
         content = _generate_fallback(news_item, style)
+
+    fact_guard_source = _build_fact_guard_source(news_item, article_content)
+    content, fact_warnings_initial, soft_claim_warnings_initial, fact_warnings = (
+        _apply_generated_article_fact_guard(content, fact_guard_source)
+    )
 
     # Save to output
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -3235,6 +3295,11 @@ def api_generate_article():
         "char_count": len(content),
         "has_source_content": bool(article_content),
         "source_content_chars": len(article_content),
+        "source_fact_tokens": _core_facts.extract_fact_tokens(fact_guard_source),
+        "fact_warnings_initial": fact_warnings_initial,
+        "soft_claim_warnings_initial": soft_claim_warnings_initial,
+        "fact_warnings": fact_warnings,
+        "fact_guard_applied": bool(fact_warnings_initial or soft_claim_warnings_initial),
     })
 
 
@@ -3581,6 +3646,37 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
         )
         return text
 
+    def render_part_heading(raw_text):
+        """Render PART headings as a WeChat-friendly fixed layout block."""
+        plain = _re.sub(r'<[^>]+>', '', raw_text or '').strip()
+        m = _re.match(r'^(?:PART)\s*(\d+)\s*(?:[-:：|/\\—–·.、\s]+)?(.*)$', plain, _re.I)
+        if not m:
+            return None
+        part_no = m.group(1)
+        subtitle = (m.group(2) or "").strip()
+        if not subtitle:
+            subtitle = "核心要点"
+        accent = accent_color or "#ff8a45"
+        return (
+            f'<section style="margin:26px auto 18px;text-align:center;max-width:320px;">'
+            f'<div style="display:inline-block;text-align:left;">'
+            f'<div style="display:flex;align-items:center;gap:10px;">'
+            f'<span style="display:inline-block;width:20px;height:20px;border-radius:50%;'
+            f'background:linear-gradient(180deg,#ffc49b 0%,{accent} 100%);position:relative;">'
+            f'<span style="position:absolute;left:0;top:11px;width:20px;height:20px;'
+            f'border-radius:50%;background:{accent};opacity:.85"></span></span>'
+            f'<span style="font-size:36px;font-style:italic;font-weight:800;'
+            f'color:{accent};letter-spacing:0;">PART {part_no}</span>'
+            f'<span style="display:inline-block;width:10px;height:70px;background:{accent};'
+            f'margin-left:2px;"></span>'
+            f'</div>'
+            f'<div style="height:1px;background:{accent};margin:8px 0 8px;width:200px;"></div>'
+            f'<div style="text-align:center;font-size:20px;font-weight:700;color:{accent};'
+            f'letter-spacing:1px;">{process_inline(subtitle)}</div>'
+            f'</div>'
+            f'</section>'
+        )
+
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -3683,12 +3779,14 @@ def _markdown_to_wechat_html(md_text, title="", theme="default", font_size=15,
             out_lines.append(html)
         elif h2:
             content = process_inline(h2.group(1))
-            html = (
-                f'<h2 style="font-size:{fs_h2}px;font-weight:700;'
-                f'color:{t["h2_color"]};margin:16px 0 10px;line-height:1.4;'
-                f'padding-bottom:8px;border-bottom:2px solid {t["strong_color"]}">'
-                f'{content}</h2>'
-            )
+            html = render_part_heading(h2.group(1))
+            if not html:
+                html = (
+                    f'<h2 style="font-size:{fs_h2}px;font-weight:700;'
+                    f'color:{t["h2_color"]};margin:16px 0 10px;line-height:1.4;'
+                    f'padding-bottom:8px;border-bottom:2px solid {t["strong_color"]}">'
+                    f'{content}</h2>'
+                )
             out_lines.append(html)
         elif h3:
             content = process_inline(h3.group(1))

@@ -61,6 +61,8 @@
     exportWechatTitle: $("#export-wechat-title"),
     exportWechatDate: $("#export-wechat-date"),
     exportWechatBody: $("#export-wechat-body"),
+    btnCopyRichWechat: $("#btn-copy-rich-wechat"),
+    publishStatus: $("#publish-status"),
     btnAutoPipeline: $("#btn-auto-pipeline"),
     pipelineProgress: $("#pipeline-progress"),
     statusMessage: $("#status-message"),
@@ -107,10 +109,21 @@
     $$(".step-panel").forEach(function (el) {
       el.classList.remove("active");
     });
-    $("#step" + step + "-panel").classList.add("active");
+    var activePanel = $("#step" + step + "-panel");
+    activePanel.classList.add("active");
 
     if (step === 2) updateStep2UI();
     if (step === 3) updateStep3UI();
+
+    if (step > 1) {
+      var rewriteBody = $("#rewrite-bar-body");
+      var toggleBtn = $("#btn-toggle-rewrite");
+      if (rewriteBody) rewriteBody.classList.add("collapsed");
+      if (toggleBtn) toggleBtn.textContent = "▼";
+    }
+    window.requestAnimationFrame(function () {
+      activePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   $$(".step").forEach(function (el) {
@@ -438,6 +451,81 @@
     });
   }
 
+  function absolutizeWechatHtml(html) {
+    var base = window.location.origin;
+    return (html || "").replace(/(<img\b[^>]*\bsrc=["'])(\/[^"']+)(["'])/gi, function (_, prefix, src, suffix) {
+      return prefix + base + src + suffix;
+    });
+  }
+
+  function wechatHtmlToPlainText(html) {
+    var div = document.createElement("div");
+    div.innerHTML = html || "";
+    return (div.textContent || div.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  function setPublishStatus(message, type) {
+    if (!dom.publishStatus) return;
+    dom.publishStatus.className = "publish-status" + (type ? " " + type : "");
+    dom.publishStatus.textContent = message || "";
+  }
+
+  function fallbackCopyWechatHtml(html) {
+    var ta = document.createElement("textarea");
+    ta.value = html;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+
+  async function copyRichWechatHtml() {
+    if (!state.articleContent) {
+      setPublishStatus("请先生成文章，再复制到公众号编辑器。", "error");
+      toast("请先生成文章", "error");
+      return;
+    }
+    setPublishStatus("正在生成公众号富文本...", "loading");
+    if (!wechatState.cachedHtml) {
+      await renderExportWechatPreview();
+    }
+    if (!wechatState.cachedHtml) {
+      setPublishStatus("公众号预览生成失败，请稍后重试。", "error");
+      return;
+    }
+
+    var html = absolutizeWechatHtml(wechatState.cachedHtml);
+    var plain = wechatHtmlToPlainText(html);
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([plain], { type: "text/plain" }),
+          }),
+        ]);
+        setPublishStatus("已复制富文本。打开公众号编辑器后直接粘贴即可，图片会按正文段落位置进入文章。", "success");
+        toast("公众号富文本已复制", "success");
+        return;
+      }
+      fallbackCopyWechatHtml(html);
+      setPublishStatus("当前浏览器不支持富文本复制，已复制 HTML 源码，可粘贴到支持 HTML 的编辑器。", "warn");
+      toast("已复制 HTML 源码", "success");
+    } catch (e) {
+      console.error("[copyRichWechatHtml] Failed:", e);
+      try {
+        fallbackCopyWechatHtml(html);
+        setPublishStatus("富文本复制失败，已降级复制 HTML 源码。", "warn");
+        toast("已复制 HTML 源码", "success");
+      } catch (fallbackError) {
+        setPublishStatus("复制失败：" + (fallbackError.message || e.message), "error");
+        toast("复制失败", "error");
+      }
+    }
+  }
+
   function refreshVisibleWechatPreviews() {
     if (currentPreviewTab === "wechat") {
       renderWechatPreview();
@@ -677,6 +765,10 @@
         toast("排版文件已下载，可直接导入公众号", "success");
       });
     }
+  }
+
+  if (dom.btnCopyRichWechat) {
+    dom.btnCopyRichWechat.addEventListener("click", copyRichWechatHtml);
   }
 
   // Style toggle

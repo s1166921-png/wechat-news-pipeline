@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,"><!-- 阻止浏览器请求 /favicon.ico -->
 <title>美鸥热点通 — 内容创作工坊</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <div id="app">
@@ -334,12 +334,20 @@
         <div class="panel-header">
           <h3>📦 导出文章</h3>
         </div>
+        <div class="publish-center">
+          <div>
+            <strong>微信公众号发布</strong>
+            <p>先检查下方微信预览，再复制富文本到公众号编辑器。</p>
+          </div>
+          <button id="btn-copy-rich-wechat" class="btn btn-primary">📋 复制到公众号编辑器</button>
+        </div>
         <div class="export-buttons">
           <button id="btn-export-docx" class="btn btn-primary">📄 导出 DOCX</button>
           <button id="btn-export-md" class="btn btn-outline">📥 导出 Markdown</button>
           <button id="btn-export-html" class="btn btn-outline">🌐 导出 HTML</button>
           <button id="btn-export-txt" class="btn btn-outline">📄 导出 TXT</button>
         </div>
+        <div id="publish-status" class="publish-status"></div>
         <div id="export-status" class="export-status"></div>
       </div>
 
@@ -416,6 +424,6 @@
 
 <!-- Markdown parser (simple client-side) -->
 <script src="marked.min.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
