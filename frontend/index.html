@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,"><!-- 阻止浏览器请求 /favicon.ico -->
 <title>美鸥热点通 — 内容创作工坊</title>
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <div id="app">
@@ -57,9 +57,9 @@
       <span class="rewrite-bar-icon">✍</span>
       <span class="rewrite-bar-title">文章改写</span>
       <span class="rewrite-bar-hint">优先粘贴公众号链接；提取不足时再粘贴全文兜底</span>
-      <button id="btn-toggle-rewrite" class="btn-toggle-rewrite" title="展开/收起">▼</button>
+      <button id="btn-toggle-rewrite" class="btn-toggle-rewrite collapsed" title="展开/收起">▼</button>
     </div>
-    <div class="rewrite-bar-body" id="rewrite-bar-body">
+    <div class="rewrite-bar-body collapsed" id="rewrite-bar-body">
       <div class="rewrite-paste-area" id="rewrite-paste-area">
         <textarea id="rewrite-raw-content" class="rewrite-raw-textarea"
                   rows="5" placeholder="粘贴微信公众号文章全文作为兜底。&#10;&#10;推荐流程：先粘贴文章链接 → 系统自动提取正文 → 提取不足时再从微信全选复制全文粘贴。"></textarea>
@@ -98,19 +98,17 @@
           <button id="btn-refresh-topics" class="btn btn-outline">🔄 刷新热点</button>
         </div>
       </div>
-      <div class="engine-selector" id="engine-selector">
-        <span class="engine-label">搜索范围：</span>
-        <label class="engine-chip" data-engine="360search"><input type="checkbox" checked> 360 新闻</label>
-        <label class="engine-chip" data-engine="sogou_news"><input type="checkbox" checked> 搜狗新闻</label>
-
-        <label class="engine-chip ebrun" data-engine="ebrun"><input type="checkbox" checked> 亿邦动力</label>
-        <label class="engine-chip kr36" data-engine="36kr"><input type="checkbox" checked> 36氪</label>
-        <label class="engine-chip" data-engine="bing"><input type="checkbox"> Bing</label>
-        <label class="engine-chip" data-engine="google_news"><input type="checkbox"> Google News</label>
-      </div>
-      <div class="hot-tags" id="hot-tags">
-        <!-- Filled by JS -->
-      </div>
+      <details class="search-advanced">
+        <summary>高级搜索范围</summary>
+        <div class="engine-selector" id="engine-selector">
+          <label class="engine-chip" data-engine="360search"><input type="checkbox" checked> 360 新闻</label>
+          <label class="engine-chip" data-engine="sogou_news"><input type="checkbox" checked> 搜狗新闻</label>
+          <label class="engine-chip ebrun" data-engine="ebrun"><input type="checkbox" checked> 亿邦动力</label>
+          <label class="engine-chip kr36" data-engine="36kr"><input type="checkbox" checked> 36氪</label>
+          <label class="engine-chip" data-engine="bing"><input type="checkbox"> Bing</label>
+          <label class="engine-chip" data-engine="google_news"><input type="checkbox"> Google News</label>
+        </div>
+      </details>
     </div>
 
     <div class="content-split">
@@ -424,6 +422,6 @@
 
 <!-- Markdown parser (simple client-side) -->
 <script src="marked.min.js?v=6"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

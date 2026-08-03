@@ -7,6 +7,7 @@ app.py — 跨境电商热点内容创作工坊 (Flask Server)
 import json, math, os, re, sys, time, hashlib, ssl
 import urllib.request, urllib.error
 from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from flask import Flask, request, jsonify, send_from_directory, send_file
@@ -227,6 +228,100 @@ _ROTATING_QUERIES = [
 ]
 
 _rotation_index = 0
+
+
+def _parse_search_age_days(date_text="", title="", now=None):
+    """Return article age in days, or 9999 when no reliable date exists."""
+    now = now or datetime.now(CST)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=CST)
+    text = f"{date_text or ''} {title or ''}".strip()
+    if not text:
+        return 9999
+
+    rel_patterns = [
+        (r"(\d+)\s*(?:分钟|分鐘)\s*前", 1 / 1440.0),
+        (r"(\d+)\s*(?:小时|小時)\s*前", 1 / 24.0),
+        (r"(\d+)\s*天\s*前", 1),
+        (r"(\d+)\s*(?:周|星期)\s*前", 7),
+        (r"(\d+)\s*个?月\s*前", 30),
+    ]
+    for pattern, factor in rel_patterns:
+        m = re.search(pattern, text)
+        if m:
+            return max(0, int(m.group(1)) * factor)
+
+    candidates = [
+        r"(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?",
+        r"(\d{1,2})月(\d{1,2})日",
+    ]
+    for idx, pattern in enumerate(candidates):
+        m = re.search(pattern, text)
+        if not m:
+            continue
+        try:
+            if idx == 0:
+                y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            else:
+                y, mo, d = now.year, int(m.group(1)), int(m.group(2))
+                # Search engines can show last year's month/day near year boundaries.
+                if datetime(y, mo, d, tzinfo=CST) - now > timedelta(days=7):
+                    y -= 1
+            dt = datetime(y, mo, d, tzinfo=CST)
+            return max(0, (now - dt).total_seconds() / 86400)
+        except ValueError:
+            pass
+
+    try:
+        parsed = parsedate_to_datetime(date_text or "")
+        if parsed:
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return max(0, (now - parsed.astimezone(CST)).total_seconds() / 86400)
+    except Exception:
+        pass
+
+    year_match = re.search(r"(20\d{2})", text)
+    if year_match:
+        try:
+            dt = datetime(int(year_match.group(1)), 7, 1, tzinfo=CST)
+            return max(0, (now - dt).total_seconds() / 86400)
+        except ValueError:
+            pass
+    return 9999
+
+
+def _freshness_label(age_days):
+    if age_days <= 7:
+        return "近7天"
+    if age_days <= 30:
+        return "近30天"
+    if age_days <= 90:
+        return "近90天"
+    if age_days < 9999:
+        return "历史"
+    return "日期未知"
+
+
+def _freshness_score_and_penalty(age_days):
+    """Freshness must dominate hot-news ranking, not act as a tiny bonus."""
+    if age_days <= 3:
+        return 38
+    if age_days <= 7:
+        return 34
+    if age_days <= 14:
+        return 28
+    if age_days <= 30:
+        return 22
+    if age_days <= 90:
+        return 10
+    if age_days <= 180:
+        return -6
+    if age_days <= 365:
+        return -16
+    if age_days < 9999:
+        return -34
+    return -12
 
 
 def _simple_get(url, timeout=15):
@@ -3049,6 +3144,8 @@ def api_search():
         # half-life ~9.7 days: 0d=12, 3d=9.7, 7d=7.3, 14d=4.4, 30d=1.4, 90d→0
         if age_days >= 0:
             score += int(12 * math.exp(-age_days / 14.0))
+        age_days = _parse_search_age_days(date, title)
+        score += _freshness_score_and_penalty(age_days)
         # Freshness signal words as small bonus
         for sig in ["最新", "趋势", "动态", "预测", "报告", "重磅", "热点"]:
             if sig in title:
@@ -3101,6 +3198,9 @@ def api_search():
     # Add small random jitter (±2) so similarly-scored articles shuffle between searches
     import random as _score_rng
     for r in all_results:
+        age_days = _parse_search_age_days(r.get("date", ""), r.get("title", ""))
+        r["age_days"] = None if age_days >= 9999 else round(age_days, 1)
+        r["freshness_label"] = _freshness_label(age_days)
         r["score"] = _search_score(r) + _score_rng.randint(-2, 2)
 
     all_results.sort(key=lambda r: r.get("score", 0), reverse=True)
@@ -3161,10 +3261,18 @@ def api_search():
                 print(f"  [InternalLink] Error: {e}")
         results.extend(_internal_discovered[:max_results])
         if _internal_discovered:
+            for r in results:
+                age_days = _parse_search_age_days(r.get("date", ""), r.get("title", ""))
+                r["age_days"] = None if age_days >= 9999 else round(age_days, 1)
+                r["freshness_label"] = _freshness_label(age_days)
+                r["score"] = _search_score(r)
+            results.sort(key=lambda r: r.get("score", 0), reverse=True)
+            results = results[:max_results]
             print(f"  [InternalLink] Discovered {len(_internal_discovered)} new articles via internal links")
 
     # ── AI 选题增强（与 /api/news-topics 保持一致）──
     results = _enrich_news_with_topics(results, max_results)
+    results.sort(key=lambda r: r.get("score", 0), reverse=True)
 
     return jsonify({
         "keyword": keyword, "results": results, "total": len(results),

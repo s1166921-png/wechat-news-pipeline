@@ -617,6 +617,134 @@ class VerifyWechatLinksEndpointTests(unittest.TestCase):
         self.assertEqual(data["results"][0]["quality"]["usable"], True)
 
 
+class SearchFreshnessRankingTests(unittest.TestCase):
+    def test_recent_articles_outrank_old_keyword_matches(self):
+        client = app.app.test_client()
+        mocked_results = [
+            {
+                "title": "2021海外仓趋势深度报告：海外仓增长路径复盘",
+                "url": "https://old.example.com/2021",
+                "source": "行业报告",
+                "date": "2021-09-01",
+                "snippet": "海外仓 趋势 海外仓 趋势 海外仓 趋势",
+                "source_type": "bing",
+            },
+            {
+                "title": "海外仓趋势更新：拉美平台调整卖家履约策略",
+                "url": "https://news.example.com/2026",
+                "source": "跨境新闻",
+                "date": "2026-08-01",
+                "snippet": "海外仓趋势正在影响跨境卖家的备货和发货安排。",
+                "source_type": "360search",
+            },
+            {
+                "title": "2023海外仓趋势观察",
+                "url": "https://old.example.com/2023",
+                "source": "行业报告",
+                "date": "2023-06-01",
+                "snippet": "海外仓趋势旧资料。",
+                "source_type": "bing",
+            },
+            {
+                "title": "海外仓服务商发布旺季备货提醒",
+                "url": "https://news2.example.com/2026",
+                "source": "行业新闻",
+                "date": "2026-07-28",
+                "snippet": "海外仓卖家需要关注旺季库存。",
+                "source_type": "sogou_news",
+            },
+            {
+                "title": "2020海外仓趋势白皮书",
+                "url": "https://old.example.com/2020",
+                "source": "白皮书",
+                "date": "2020-01-01",
+                "snippet": "海外仓 趋势",
+                "source_type": "bing",
+            },
+            {
+                "title": "海外仓政策动态",
+                "url": "https://news3.example.com/2026",
+                "source": "行业新闻",
+                "date": "2026-07-20",
+                "snippet": "海外仓相关政策动态。",
+                "source_type": "360search",
+            },
+        ]
+
+        with patch("app._build_search_queries", return_value=[("海外仓 趋势", ["360search"])]), \
+             patch("app._search_multi_engine", return_value=mocked_results), \
+             patch("app._enrich_news_with_topics", side_effect=lambda results, limit: list(reversed(results[:limit]))), \
+             patch("random.randint", return_value=0):
+            response = client.post("/api/search", json={
+                "keyword": "海外仓 趋势",
+                "max_results": 6,
+                "engines": ["360search"],
+            })
+
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        titles = [r["title"] for r in data["results"]]
+        self.assertIn("海外仓趋势更新：拉美平台调整卖家履约策略", titles[:2])
+        self.assertNotIn("2021海外仓趋势深度报告：海外仓增长路径复盘", titles[:2])
+        self.assertEqual(data["results"][0]["freshness_label"], "近7天")
+
+    def test_parse_search_age_days_reads_chinese_and_absolute_dates(self):
+        now = datetime(2026, 8, 3, 12, 0, tzinfo=app.CST)
+
+        self.assertLess(app._parse_search_age_days("2026-08-01", now=now), 3)
+        self.assertLess(app._parse_search_age_days("8月1日", now=now), 3)
+        self.assertGreater(app._parse_search_age_days("2021-09-01", now=now), 1000)
+
+    def test_internal_wechat_links_are_rescored_after_discovery(self):
+        client = app.app.test_client()
+        base_results = [
+            {
+                "title": "warehouse trend entry article",
+                "url": "https://mp.weixin.qq.com/s/base",
+                "source": "公众号",
+                "date": "2026-07-01",
+                "snippet": "warehouse trend entry.",
+                "source_type": "wechat",
+            },
+            {
+                "title": "warehouse trend evergreen unknown-date explainer",
+                "url": "https://old.example.com/unknown",
+                "source": "亿邦动力",
+                "date": "",
+                "snippet": "warehouse trend older reference.",
+                "source_type": "ebrun",
+            },
+        ]
+        internal = [{
+            "title": "warehouse trend weekly update recent service change",
+            "url": "https://mp.weixin.qq.com/s/recent",
+            "source": "公众号",
+            "date": "2026-08-01",
+            "snippet": "warehouse trend recent update.",
+            "source_type": "wechat",
+        }]
+
+        with patch("app._build_search_queries", return_value=[("warehouse trend", ["wechat"])]), \
+             patch("app._search_multi_engine", return_value=base_results), \
+             patch("app._extract_internal_links", return_value=internal), \
+             patch("app._enrich_news_with_topics", side_effect=lambda results, limit: results[:limit]), \
+             patch("random.randint", return_value=0):
+            response = client.post("/api/search", json={
+                "keyword": "warehouse trend",
+                "max_results": 5,
+                "engines": ["wechat"],
+            })
+
+        data = response.get_json()
+        titles = [r["title"] for r in data["results"]]
+        self.assertLess(
+            titles.index("warehouse trend weekly update recent service change"),
+            titles.index("warehouse trend evergreen unknown-date explainer"),
+        )
+        recent = next(r for r in data["results"] if r["url"].endswith("/recent"))
+        self.assertEqual(recent["freshness_label"], "近7天")
+
+
 class ImageEmbeddingTests(unittest.TestCase):
     def test_wechat_html_embeds_body_image_object_url(self):
         html = app._markdown_to_wechat_html(

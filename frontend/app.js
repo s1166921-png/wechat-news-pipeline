@@ -36,7 +36,6 @@
     btnSearch: $("#btn-search"),
     btnRefreshTopics: $("#btn-refresh-topics"),
     engineSelector: $("#engine-selector"),
-    hotTags: $("#hot-tags"),
     newsList: $("#news-list"),
     newsCount: $("#news-badge"),
     newsDetailPanel: $("#news-detail-panel"),
@@ -146,6 +145,7 @@
 
   // ── Step 1: Hot Tags ─────────────────────────────
   async function loadHotTags() {
+    if (!dom.hotTags) return;
     try {
       var r = await fetch("/config/keywords.json");
       if (!r.ok) return;
@@ -250,6 +250,14 @@
   });
 
   // ── News List Rendering ──────────────────────────
+  function freshnessClass(item) {
+    var label = item.freshness_label || "";
+    if (label === "近7天") return "fresh";
+    if (label === "近30天" || label === "近90天") return "recent";
+    if (label === "历史") return "old";
+    return "unknown";
+  }
+
   function renderNewsList() {
     if (!state.newsItems.length) {
       dom.newsList.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>暂无结果，换个关键词试试</p></div>';
@@ -257,9 +265,9 @@
     }
     dom.newsList.innerHTML = state.newsItems
       .map(function (item, i) {
-        // Use backend score (0-55) instead of simplistic frontend calculation
         var score = item.score || 0;
-        var scoreClass = score >= 45 ? "high" : score >= 30 ? "medium" : "";
+        var freshness = item.freshness_label || "日期未知";
+        var freshnessCls = freshnessClass(item);
         var summaryHtml = item.article_summary
           ? '<div class="news-item-summary">' + escHtml(item.article_summary) + "</div>"
           : "";
@@ -268,9 +276,10 @@
           '<div class="news-item-title">' + escHtml(item.title) + "</div>",
           summaryHtml,
           '<div class="news-item-meta">',
-          '<span class="news-item-score ' + scoreClass + '">' + score + "分</span>",
+          '<span class="news-item-freshness ' + freshnessCls + '">' + escHtml(freshness) + "</span>",
           "<span>" + escHtml(item.source || "未知来源") + "</span>",
           item.date ? "<span>" + escHtml(item.date) + "</span>" : "",
+          '<span>热度 ' + score + "</span>",
           "</div></div>",
         ].join("");
       })
@@ -1470,7 +1479,6 @@
   // ── Init ──────────────────────────────────────────
   async function init() {
     checkHealth();
-    loadHotTags();
     setupCoverPromptEditor();
     setupWechatToolbar();
     // Load initial topics
