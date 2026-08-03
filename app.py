@@ -268,6 +268,8 @@ def _parse_search_age_days(date_text="", title="", now=None):
                 if datetime(y, mo, d, tzinfo=CST) - now > timedelta(days=7):
                     y -= 1
             dt = datetime(y, mo, d, tzinfo=CST)
+            if dt - now > timedelta(days=1):
+                return 9999
             return max(0, (now - dt).total_seconds() / 86400)
         except ValueError:
             pass
@@ -1634,6 +1636,20 @@ def _build_search_queries(keyword, profile_terms=None):
         queries = [(kw_clean, None)]
     else:
         queries = [(kw, None)]
+
+    tax_delay_terms = ("慢", "卡", "延迟", "延長", "延长", "进度", "進度", "周期", "多久", "函调", "審核", "审核")
+    if "出口退税" in kw and any(term in kw for term in tax_delay_terms):
+        tax_queries = [
+            ("出口退税 办理", ["360search", "sogou_news", "ebrun", "google_news"]),
+            ("出口退税 申报", ["360search", "sogou_news", "ebrun", "google_news"]),
+            ("出口退税 进度", ["360search", "sogou_news", "ebrun", "google_news"]),
+            ("出口退税 周期", ["360search", "sogou_news", "google_news"]),
+        ]
+        existing_queries = {q[0] for q in queries}
+        for q in tax_queries:
+            if q[0] not in existing_queries:
+                queries.append(q)
+                existing_queries.add(q[0])
 
     # 如果纯中文且不含"跨境"等字眼，加一个带上下文的变体
     has_cjk = any('一' <= c <= '鿿' for c in kw)

@@ -618,6 +618,14 @@ class VerifyWechatLinksEndpointTests(unittest.TestCase):
 
 
 class SearchFreshnessRankingTests(unittest.TestCase):
+    def test_tax_delay_keyword_expands_to_business_queries(self):
+        queries = app._build_search_queries("出口退税慢")
+        query_texts = [q for q, _ in queries]
+
+        self.assertEqual(query_texts[0], "出口退税慢")
+        self.assertIn("出口退税 办理", query_texts[:3])
+        self.assertIn("出口退税 申报", query_texts[:3])
+
     def test_recent_articles_outrank_old_keyword_matches(self):
         client = app.app.test_client()
         mocked_results = [
@@ -694,6 +702,7 @@ class SearchFreshnessRankingTests(unittest.TestCase):
         self.assertLess(app._parse_search_age_days("2026-08-01", now=now), 3)
         self.assertLess(app._parse_search_age_days("8月1日", now=now), 3)
         self.assertGreater(app._parse_search_age_days("2021-09-01", now=now), 1000)
+        self.assertGreater(app._parse_search_age_days("2026-11-01", now=now), 1000)
 
     def test_internal_wechat_links_are_rescored_after_discovery(self):
         client = app.app.test_client()
