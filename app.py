@@ -2209,6 +2209,60 @@ B2P_SYSTEM_PROMPT = """你是一位深耕跨境电商行业的政策分析师兼
 # ║  Article Content Fetcher — 从源 URL 抓取文章正文             ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+def _fetch_with_agent_reach_jina(url, timeout=20):
+    """Fetch readable article text through Agent Reach's web backend (Jina Reader)."""
+    import urllib.request as _ur2
+    import ssl as _ssl2
+    import re as _re2
+
+    if not url:
+        return ("", url)
+
+    ctx = _ssl2.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = _ssl2.CERT_NONE
+
+    jina_url = f"https://r.jina.ai/{url}"
+    headers = {
+        "Accept": "text/markdown,text/plain;q=0.9,*/*;q=0.8",
+        "User-Agent": "agent-reach/1.0 wechat-news-pipeline/1.0",
+    }
+    try:
+        req = _ur2.Request(jina_url, headers=headers)
+        with _ur2.urlopen(req, timeout=timeout, context=ctx) as resp:
+            md_text = resp.read(1024 * 1024).decode("utf-8", errors="replace")
+    except Exception as e:
+        print(f"  [Fetch] Agent Reach/Jina failed for {url[:80]}: {e}")
+        return ("", url)
+
+    if not md_text or len(md_text.strip()) < 120:
+        return ("", url)
+
+    lines = md_text.splitlines()
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            cleaned.append("")
+            continue
+        if stripped.startswith(("Title:", "URL Source:", "Markdown Content:", "Published Time:", "Warning:")):
+            continue
+        if stripped.startswith(">") and "jina.ai" in stripped:
+            continue
+        cleaned.append(stripped)
+
+    content = "\n".join(cleaned).strip()
+    content = _re2.sub(r"\n{3,}", "\n\n", content)
+    content = _re2.sub(r"!\[[^\]]*\]\([^)]+\)", "", content)
+    if len(content) > 6000:
+        content = content[:6000] + "\n\n…[原文过长，已截断]"
+
+    if len(content) >= 120:
+        print(f"  [Fetch] Agent Reach/Jina OK: {len(content)} chars from {url[:80]}")
+        return (content, url)
+    return ("", url)
+
+
 def _fetch_general_article(url, timeout=12):
     """从 URL 抓取网页正文文本。用于给 AI 提供真实原文内容作为写作素材。
 
@@ -2217,7 +2271,8 @@ def _fetch_general_article(url, timeout=12):
     策略：
     1. 如果是 Google News 重定向 URL，先跟踪重定向获取真实 URL
     2. 用 BeautifulSoup 提取 <article>/<main> 或 body 中的主要段落文本
-    3. 清理导航、广告、脚本等噪音
+    3. 直接抓取失败时，用 Agent Reach/Jina Reader 兜底抓正文
+    4. 清理导航、广告、脚本等噪音
     """
     import urllib.request as _ur2
     import ssl as _ssl2
@@ -2252,13 +2307,14 @@ def _fetch_general_article(url, timeout=12):
         html = resp.read(2 * 1024 * 1024).decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         print(f"  [Fetch] HTTP {e.code} for {url[:80]}")
-        return ("", resolved_url)
+        return _fetch_with_agent_reach_jina(resolved_url, timeout=max(timeout, 20))
     except Exception as e:
         print(f"  [Fetch] Error for {url[:80]}: {e}")
-        return ("", resolved_url)
+        return _fetch_with_agent_reach_jina(resolved_url, timeout=max(timeout, 20))
 
     if not html or len(html) < 1000:
-        return ("", resolved_url)
+        jina_content, jina_url = _fetch_with_agent_reach_jina(resolved_url, timeout=max(timeout, 20))
+        return (jina_content, jina_url or resolved_url)
 
     try:
         soup = _BS3(html, "lxml")
@@ -2267,7 +2323,7 @@ def _fetch_general_article(url, timeout=12):
         try:
             soup = _BS3(html, "html.parser")
         except Exception:
-            return ("", resolved_url)
+            return _fetch_with_agent_reach_jina(resolved_url, timeout=max(timeout, 20))
 
     # Remove non-content elements
     for tag in soup.select(
@@ -2341,7 +2397,8 @@ def _fetch_general_article(url, timeout=12):
         return (content, resolved_url)
     else:
         print(f"  [Fetch] Content too short ({len(content)} chars) from {resolved_url[:80]}")
-        return ("", resolved_url)
+        jina_content, jina_url = _fetch_with_agent_reach_jina(resolved_url, timeout=max(timeout, 20))
+        return (jina_content, jina_url or resolved_url)
 
 
 def _build_article_prompt(news_item, style="b2b", custom_angle="", article_content=""):

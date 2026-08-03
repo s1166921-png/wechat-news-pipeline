@@ -1,6 +1,7 @@
 import unittest
 import subprocess
 import sys
+import urllib.error
 from zipfile import ZipFile
 from base64 import b64decode
 from io import BytesIO
@@ -227,6 +228,23 @@ class ImageGenerationTests(unittest.TestCase):
 
 
 class GenerateArticleFactGuardTests(unittest.TestCase):
+    def test_general_article_fetch_falls_back_to_agent_reach_jina_on_http_error(self):
+        err = urllib.error.HTTPError(
+            url="https://example.com/protected",
+            code=403,
+            msg="Forbidden",
+            hdrs=None,
+            fp=None,
+        )
+
+        with patch("urllib.request.urlopen", side_effect=err), \
+             patch("app._fetch_with_agent_reach_jina", return_value=("真实正文" * 80, "https://example.com/protected")) as jina:
+            content, resolved = app._fetch_general_article("https://example.com/protected")
+
+        self.assertGreater(len(content), 100)
+        self.assertEqual(resolved, "https://example.com/protected")
+        jina.assert_called_once()
+
     def test_generate_article_removes_unsupported_fact_tokens(self):
         client = app.app.test_client()
         generated = (
@@ -670,13 +688,16 @@ class SearchFreshnessRankingTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(calls, [("warehouse trend", ["baidu"])])
 
-    def test_frontend_exposes_baidu_zhihu_and_wechat_sources(self):
+    def test_frontend_keeps_previous_source_selector_after_ui_rollback(self):
         with open("frontend/index.html", encoding="utf-8") as f:
             html = f.read()
 
-        self.assertIn('data-engine="baidu"', html)
-        self.assertIn('data-engine="zhihu"', html)
-        self.assertIn('data-engine="wechat"', html)
+        self.assertIn('data-engine="360search"', html)
+        self.assertIn('data-engine="sogou_news"', html)
+        self.assertIn('data-engine="ebrun"', html)
+        self.assertNotIn('data-engine="baidu"', html)
+        self.assertNotIn('data-engine="zhihu"', html)
+        self.assertNotIn('data-engine="wechat"', html)
 
     def test_trend_keyword_expands_to_recent_entity_queries(self):
         queries = app._build_search_queries("海外仓 趋势")
