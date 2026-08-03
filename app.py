@@ -458,6 +458,124 @@ def _search_bing(keyword, max_results=10):
     return results
 
 
+def _search_baidu(keyword, max_results=10):
+    """Search Baidu web results.
+
+    Baidu is useful for Chinese recall because it understands short local
+    business queries better than Google News. We keep it as a general web
+    source, then let the existing freshness/quality ranker decide what survives.
+    """
+    from urllib.parse import quote as _quote
+    from bs4 import BeautifulSoup as _BS
+    import re as _re
+
+    results = []
+    try:
+        url = f"https://www.baidu.com/baidu?tn=monline_3_dg&ie=utf-8&wd={_quote(keyword)}&rn={max_results}"
+        html = _simple_get(url, timeout=12)
+        if not html:
+            return results
+        if "百度安全验证" in html or "安全验证" in html[:3000]:
+            return results
+
+        soup = _BS(html, "lxml")
+        items = soup.select("div.result, div.c-container, div[class*=result]")
+        if not items:
+            items = [a.find_parent("div") or a for a in soup.select("h3 a[href], a[href]")]
+
+        seen = set()
+        for item in items:
+            if len(results) >= max_results:
+                break
+            a = item.select_one("h3 a[href]") or item.select_one("a[href]")
+            if not a:
+                continue
+            title = a.get_text(" ", strip=True)
+            href = a.get("href", "")
+            if len(title) < 8 or not href:
+                continue
+            if href in seen or "baidu.com/s?" in href:
+                continue
+            if "baidu.com/link" in href or "baidu.com/baidu.php" in href:
+                try:
+                    final_href = _urlopen_final_url(href, timeout=4, headers=_GN_HEADERS)
+                    if final_href and final_href.startswith("http"):
+                        href = final_href
+                except Exception:
+                    pass
+            if "baidu.com/baidu.php" in href:
+                continue
+            seen.add(href)
+
+            snippet = ""
+            for selector in (
+                ".c-abstract", ".content-right_8Zs40", ".c-span-last",
+                "div[class*=abstract]", "div[class*=content]", "span[class*=content]",
+            ):
+                el = item.select_one(selector)
+                if el:
+                    snippet = el.get_text(" ", strip=True)
+                    break
+            if not snippet:
+                text = item.get_text(" ", strip=True)
+                snippet = text.replace(title, "", 1).strip()
+            snippet = _re.sub(r"\s+", " ", snippet)[:500]
+
+            date_str = ""
+            dm = _re.search(
+                r"(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?|\d{1,2}分钟前|\d{1,2}小时前|\d{1,2}天前)",
+                snippet,
+            )
+            if dm:
+                date_str = dm.group(1)
+
+            source = ""
+            cite = item.select_one("cite, .c-showurl, span[class*=site], span[class*=source]")
+            if cite:
+                source = cite.get_text(" ", strip=True)[:80]
+
+            results.append({
+                "title": title[:200],
+                "url": href,
+                "source": source,
+                "date": date_str,
+                "source_type": "baidu",
+                "snippet": snippet,
+            })
+    except Exception as e:
+        print(f"  [Baidu] Error: {e}")
+    return results
+
+
+def _search_zhihu(keyword, max_results=10):
+    """Search Zhihu content through Baidu's site-restricted index.
+
+    Direct Zhihu search pages are heavily JS/login driven. For automation, a
+    site-restricted Chinese search query is more stable and still captures
+    answers/articles/columns that Baidu indexed.
+    """
+    results = []
+    seen = set()
+    for site_query in (f"site:zhihu.com {keyword}", f"site:zhuanlan.zhihu.com {keyword}"):
+        for r in _search_baidu(site_query, max_results=max_results):
+            url = r.get("url", "")
+            title = r.get("title", "")
+            combined = f"{url} {title} {r.get('snippet', '')}"
+            if "zhihu.com" not in combined and "zhuanlan.zhihu.com" not in combined:
+                continue
+            key = url.split("#")[0].rstrip("/")
+            if key in seen:
+                continue
+            seen.add(key)
+            r = dict(r)
+            r["source_type"] = "zhihu"
+            r["source"] = r.get("source") or "知乎"
+            results.append(r)
+            if len(results) >= max_results:
+                return results
+    return results
+
+
 def _search_360(keyword, max_results=10):
     """Search 360 News (news.so.com) for dated Chinese news articles.
 
@@ -1654,6 +1772,23 @@ def _build_search_queries(keyword, profile_terms=None):
     # 如果纯中文且不含"跨境"等字眼，加一个带上下文的变体
     has_cjk = any('一' <= c <= '鿿' for c in kw)
     has_ecom = any(ek in kw for ek in _ECOMMERCE_KEYWORDS)
+    trend_intent_terms = ("趋势", "动态", "发展", "现状", "报告", "热点", "观察", "分析")
+    if has_cjk and has_ecom and any(term in kw for term in trend_intent_terms):
+        core_kw = kw_clean if kw_clean != kw else kw
+        for term in trend_intent_terms:
+            core_kw = core_kw.replace(term, "")
+        core_kw = re.sub(r"\s+", " ", core_kw).strip(" 的和与及-:：")
+        if 2 <= len(core_kw) <= 24:
+            trend_queries = [
+                (f"{core_kw} 最新", ["baidu", "360search", "sogou_news", "wechat", "ebrun", "36kr"]),
+                (f"{core_kw} 动态", ["baidu", "360search", "sogou_news", "wechat", "ebrun", "36kr"]),
+                (f"{core_kw} 2026", ["baidu", "360search", "sogou_news", "wechat", "ebrun", "36kr"]),
+            ]
+            existing_queries = {q[0] for q in queries}
+            for q in trend_queries:
+                if q[0] not in existing_queries:
+                    queries.append(q)
+                    existing_queries.add(q[0])
     if has_cjk and not has_ecom and len(kw) <= 15:
         ctx_q = f"跨境电商 {kw_clean if kw_clean != kw else kw}"
         if ctx_q not in [q[0] for q in queries]:
@@ -1680,7 +1815,7 @@ def _search_multi_engine(keyword, max_per_source=5, engines=None):
 
     # Which engines to use
     if engines is None or (isinstance(engines, list) and len(engines) == 0):
-        engines = ["bing", "360search", "google_news", "sogou_news", "ebrun", "36kr", "wechat"]
+        engines = ["baidu", "bing", "360search", "google_news", "sogou_news", "ebrun", "36kr", "wechat", "zhihu"]
     use_engine = set(e.lower().replace("-", "_") for e in engines)
     want_all = "all" in use_engine
 
@@ -1695,6 +1830,8 @@ def _search_multi_engine(keyword, max_per_source=5, engines=None):
 
     # Build task list: (engine_name, function, args)
     tasks = []
+    if want_all or "baidu" in use_engine:
+        tasks.append(("baidu", _search_baidu, (keyword, max_per_source * 3)))
     if want_all or "bing" in use_engine:
         tasks.append(("bing", _search_bing, (keyword, max_per_source * 2)))
     if want_all or "360search" in use_engine or "360" in use_engine:
@@ -1709,6 +1846,8 @@ def _search_multi_engine(keyword, max_per_source=5, engines=None):
         tasks.append(("36kr", _search_36kr, (keyword, max_per_source * 2)))
     if want_all or "wechat" in use_engine or "weixin" in use_engine:
         tasks.append(("wechat", _search_wechat, (keyword, max_per_source * 2)))
+    if want_all or "zhihu" in use_engine:
+        tasks.append(("zhihu", _search_zhihu, (keyword, max_per_source * 2)))
     # ── 第 2 层：社交平台反向链接发现 ──
     if want_all or "xhs_discovery" in use_engine:
         tasks.append(("xhs_discovery", _discover_wechat_from_xhs, (keyword, max_per_source)))
@@ -2892,12 +3031,24 @@ def api_search():
     # ── 并行搜索所有查询（每个查询内部也是多引擎并行）──
     all_results = []
     seen_urls = set()
-    for sq, query_engines in search_queries[:3]:  # Max 3 queries
+    for sq, query_engines in search_queries[:4]:  # Max 4 queries
         if len(all_results) >= max_results * 5:
             break
         try:
-            # query_engines = None → use all defaults; list → specific engines
-            batch = _search_multi_engine(sq, max_per_source=5, engines=query_engines)
+            effective_engines = query_engines
+            if engines:
+                if query_engines:
+                    selected = {str(e).lower().replace("-", "_") for e in engines}
+                    effective_engines = [
+                        e for e in query_engines
+                        if str(e).lower().replace("-", "_") in selected
+                    ]
+                    if not effective_engines:
+                        continue
+                else:
+                    effective_engines = engines
+            # query_engines = None → selected/default engines; list → specific engines
+            batch = _search_multi_engine(sq, max_per_source=5, engines=effective_engines)
             for r in batch:
                 url_key = re.sub(r"[?#].*$", "", r.get("url", "")).rstrip("/")
                 if url_key not in seen_urls:

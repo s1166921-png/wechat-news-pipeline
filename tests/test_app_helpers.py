@@ -618,6 +618,73 @@ class VerifyWechatLinksEndpointTests(unittest.TestCase):
 
 
 class SearchFreshnessRankingTests(unittest.TestCase):
+    def test_multi_engine_can_call_baidu_and_zhihu_sources(self):
+        with patch("app._search_baidu", return_value=[{
+            "title": "warehouse trend baidu fresh article",
+            "url": "https://example.com/baidu",
+            "source": "Baidu",
+            "date": "",
+            "source_type": "baidu",
+            "snippet": "warehouse trend",
+        }]), patch("app._search_zhihu", return_value=[{
+            "title": "warehouse trend zhihu analysis",
+            "url": "https://www.zhihu.com/question/1",
+            "source": "Zhihu",
+            "date": "",
+            "source_type": "zhihu",
+            "snippet": "warehouse trend",
+        }]):
+            results = app._search_multi_engine("warehouse trend", max_per_source=1, engines=["baidu", "zhihu"])
+
+        source_types = {r["source_type"] for r in results}
+        self.assertIn("baidu", source_types)
+        self.assertIn("zhihu", source_types)
+
+    def test_api_search_respects_selected_engines_from_ui(self):
+        client = app.app.test_client()
+        calls = []
+
+        def fake_search(query, max_per_source=5, engines=None):
+            calls.append((query, engines))
+            return [{
+                "title": "warehouse trend selected baidu result",
+                "url": "https://example.com/selected",
+                "source": "Baidu",
+                "date": "2026-08-01",
+                "source_type": "baidu",
+                "snippet": "warehouse trend selected result",
+            }]
+
+        with patch("app._build_search_queries", return_value=[
+            ("warehouse trend", None),
+            ("warehouse trend news", ["google_news"]),
+        ]), patch("app._search_multi_engine", side_effect=fake_search), \
+             patch("app._enrich_news_with_topics", side_effect=lambda results, limit: results[:limit]), \
+             patch("random.randint", return_value=0):
+            response = client.post("/api/search", json={
+                "keyword": "warehouse trend",
+                "max_results": 5,
+                "engines": ["baidu"],
+            })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(calls, [("warehouse trend", ["baidu"])])
+
+    def test_frontend_exposes_baidu_zhihu_and_wechat_sources(self):
+        with open("frontend/index.html", encoding="utf-8") as f:
+            html = f.read()
+
+        self.assertIn('data-engine="baidu"', html)
+        self.assertIn('data-engine="zhihu"', html)
+        self.assertIn('data-engine="wechat"', html)
+
+    def test_trend_keyword_expands_to_recent_entity_queries(self):
+        queries = app._build_search_queries("海外仓 趋势")
+        query_texts = [q for q, _ in queries]
+
+        self.assertIn("海外仓 最新", query_texts)
+        self.assertIn("海外仓 动态", query_texts)
+        self.assertIn("海外仓 2026", query_texts)
     def test_tax_delay_keyword_expands_to_business_queries(self):
         queries = app._build_search_queries("出口退税慢")
         query_texts = [q for q, _ in queries]
